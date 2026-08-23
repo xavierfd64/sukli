@@ -71,6 +71,14 @@ class Request
         return substr((string) ($this->server['HTTP_USER_AGENT'] ?? ''), 0, 255);
     }
 
+    public function file(string $key): ?array
+    {
+        if (empty($_FILES[$key]) || ($_FILES[$key]['error'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_NO_FILE) {
+            return null;
+        }
+        return $_FILES[$key];
+    }
+
     public function param(string $key, mixed $default = null): mixed
     {
         return $this->params[$key] ?? $default;

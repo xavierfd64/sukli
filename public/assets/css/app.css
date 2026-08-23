@@ -358,3 +358,36 @@ label { display: block; font-size: 12.5px; font-weight: 600; margin-bottom: 6px;
   .card { padding: 14px 16px; }
   .user-chip .user-meta { display: none; }
 }
+
+/* ---------------------------------------------------------------------- */
+/* POS                                                                     */
+/* ---------------------------------------------------------------------- */
+
+.pos-layout { display: grid; grid-template-columns: 1fr 340px; gap: 18px; align-items: start; }
+@media (max-width: 1024px) {
+  .pos-layout { grid-template-columns: 1fr; }
+  .pos-cart { order: 2; }
+  .pos-products { order: 1; }
+}
+
+.pos-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 12px; }
+.pos-product {
+  background: #fff; border: 1px solid var(--border); border-radius: 12px; padding: 12px;
+  text-align: left; cursor: pointer; transition: box-shadow .15s ease, transform .1s ease;
+}
+.pos-product:hover { box-shadow: var(--shadow); transform: translateY(-1px); }
+.pos-product:active { transform: translateY(0); }
+.pos-product-name { font-weight: 600; font-size: 13px; margin-bottom: 6px; min-height: 34px; }
+.pos-product-price { color: var(--green-dark); font-weight: 700; font-size: 14px; }
+.pos-product-stock { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+.pos-product.is-hidden { display: none; }
+
+.pos-cart { position: sticky; top: calc(var(--topbar-h) + 16px); }
+.pos-cart-item { display: flex; align-items: center; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--border); gap: 8px; }
+.pos-cart-item .pci-name { font-size: 13px; font-weight: 600; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pos-cart-item .pci-price { font-size: 11.5px; color: var(--text-muted); }
+.pos-qty-controls { display: flex; align-items: center; gap: 6px; }
+.pos-qty-controls button { width: 24px; height: 24px; border-radius: 6px; border: 1px solid var(--border); background: #fff; line-height: 1; }
+.pos-cart-item .pci-total { font-size: 13px; font-weight: 700; width: 64px; text-align: right; }
+.pos-cart-item .pci-remove { color: var(--red); background: none; border: none; font-size: 16px; padding: 0 2px; }
+@media (max-width: 1024px) { .pos-cart { position: static; } }

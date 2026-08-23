@@ -57,6 +57,8 @@ $router->post('/inventory/{id}', [InventoryController::class, 'update'], [$auth,
 $router->post('/inventory/{id}/archive', [InventoryController::class, 'archive'], [$auth, $ownerManager, $csrf]);
 $router->post('/inventory/{id}/adjust', [InventoryController::class, 'adjustStock'], [$auth, $ownerManager, $csrf]);
 $router->post('/inventory/categories', [InventoryController::class, 'storeCategory'], [$auth, $ownerManager, $csrf]);
+$router->get('/inventory/export.csv', [InventoryController::class, 'exportCsv'], [$auth, $ownerManager]);
+$router->post('/inventory/import', [InventoryController::class, 'importCsv'], [$auth, $ownerManager, $csrf]);
 
 // -- Income / Expenses --------------------------------------------------------
 $router->get('/income', [IncomeController::class, 'index'], [$auth]);
