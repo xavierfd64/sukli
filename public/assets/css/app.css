@@ -382,6 +382,9 @@ label { display: block; font-size: 12.5px; font-weight: 600; margin-bottom: 6px;
 .pos-product-stock { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
 .pos-product.is-hidden { display: none; }
 
+.settings-layout { grid-template-columns: 2.2fr 1fr; align-items: start; }
+@media (max-width: 900px) { .settings-layout { grid-template-columns: 1fr; } }
+
 .pos-cart { position: sticky; top: calc(var(--topbar-h) + 16px); }
 .pos-cart-item { display: flex; align-items: center; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--border); gap: 8px; }
 .pos-cart-item .pci-name { font-size: 13px; font-weight: 600; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

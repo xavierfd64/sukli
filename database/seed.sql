@@ -6,6 +6,8 @@
 -- IMPORTANT: change the Owner password immediately after first login.
 -- Seeded login: username "owner" / password "Owner@12345"
 
+SET NAMES utf8mb4;
+
 INSERT INTO roles (id, role_key, name, description) VALUES
     (1, 'owner', 'Owner', 'Full access: settings, feature management, users, reports, all records.'),
     (2, 'manager', 'Manager', 'Most operational access with limited sensitive settings.'),

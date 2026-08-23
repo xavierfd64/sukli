@@ -47,10 +47,16 @@ function runSqlFile(PDO $pdo, string $path): void
         exit(1);
     }
 
-    $sql = file_get_contents($path);
-    foreach (array_filter(array_map('trim', explode(";\n", $sql))) as $statement) {
-        $statement = trim($statement);
-        if ($statement === '' || str_starts_with($statement, '--')) {
+    // Strip full-line comments first so a "-- section header" line above a
+    // statement can never cause the statement after it to be dropped.
+    $cleanedLines = array_filter(
+        explode("\n", file_get_contents($path)),
+        fn (string $line): bool => !str_starts_with(trim($line), '--')
+    );
+    $sql = implode("\n", $cleanedLines);
+
+    foreach (array_filter(array_map('trim', explode(';', $sql))) as $statement) {
+        if ($statement === '') {
             continue;
         }
         $pdo->exec($statement);
