@@ -39,33 +39,37 @@ subdirectory.
 
 ## Local Development
 
-1. Create a MySQL/MariaDB database and user.
-2. Copy `.env.example` to `.env` and fill in `DB_*` (and set `APP_URL` to
-   wherever you're serving from, e.g. `http://127.0.0.1:8000`).
-3. Build the schema and seed demo data:
-   ```
-   php database/migrate.php --seed
-   ```
-4. Serve it with PHP's built-in server (uses `public/router.php`, which
-   exists only so static assets work under `php -S`; Apache/.htaccess
-   handles that in production instead):
+The easiest path is the same installer wizard described below — just point
+PHP's built-in server at the project and open `/install` in a browser:
+
+1. Create a MySQL/MariaDB database and user (the installer creates the
+   tables; it just needs a database that already exists and a user with
+   privileges on it).
+2. Serve it (uses `public/router.php`, which exists only so static assets
+   work under `php -S`; Apache/.htaccess handles that in production
+   instead):
    ```
    php -S 127.0.0.1:8000 -t public public/router.php
    ```
-5. Log in at `/login` with the seeded Owner account:
-   - Username: `owner`
-   - Password: `Owner@12345`
-   - **Change this password immediately** (Settings → Security) — it's a
-     known default from `database/seed.sql`.
+3. Open `http://127.0.0.1:8000/` — you'll land on the installer
+   automatically. Follow the wizard (database details → Owner account →
+   store info → Install).
+
+If you'd rather skip the wizard and get demo data instantly (sample
+products, a seeded `owner`/`Owner@12345` login), use the CLI path instead:
+copy `.env.example` to `.env`, fill in `DB_*`, run
+`php database/migrate.php --seed`, then create `storage/installed.lock`
+yourself (any content) so the app doesn't redirect you to `/install`.
 
 ## Deploying to Z.com Shared Hosting
 
-1. **Database**: create a MySQL database and user from your hosting
-   control panel, then import the schema via phpMyAdmin:
-   - Import `database/schema.sql`, then `database/seed.sql` (or skip the
-     seed and create your own Owner account manually — see below).
-   - If your hosting gives you SSH + PHP CLI, `php database/migrate.php
-     --seed` does the same thing.
+Sukli installs like WordPress: upload the files, open the site, and a
+setup wizard walks you through the rest — no manual SQL import, no manual
+`.env` editing.
+
+1. **Database**: create a MySQL database and a database user from your
+   hosting control panel (phpMyAdmin isn't needed for setup — just note the
+   host, database name, username, and password the wizard will ask for).
 2. **Upload the files**: upload the whole project (not just `public/`) to
    your hosting account, e.g. to a directory above `public_html/`.
 3. **Document root**:
@@ -76,23 +80,29 @@ subdirectory.
    - If you're stuck with `public_html/` as the fixed document root (common
      on cheap shared hosting), upload the project so that `public_html/`
      itself **is** this repo's root (i.e. `public_html/app`,
-     `public_html/public`, `public_html/.env`, etc.). The root `.htaccess`
-     included here rewrites every request into `public/` for you, and the
-     per-directory `.htaccess` files block direct access to everything
-     else.
-4. **`.env`**: create `.env` from `.env.example` on the server (never commit
-   real credentials) with your production `DB_*` values, `APP_ENV=production`,
-   `APP_DEBUG=false`, and `APP_URL` set to your real domain.
-5. **HTTPS**: enable HTTPS/SSL for the domain (most shared hosts offer free
+     `public_html/public`, etc.). The root `.htaccess` included here
+     rewrites every request into `public/` for you, and the per-directory
+     `.htaccess` files block direct access to everything else.
+   - Either way, make sure the project root and the `storage/` folder are
+     writable by PHP — the installer needs to create `.env` and
+     `storage/installed.lock`.
+4. **HTTPS**: enable HTTPS/SSL for the domain (most shared hosts offer free
    Let's Encrypt certificates) — session cookies are marked `Secure`
    automatically once the request comes in over HTTPS.
-6. **First login & cleanup**:
-   - Log in with the seeded Owner account and change the password right
-     away (Settings → Security), or skip `seed.sql` entirely and insert
-     your own `organizations` / `stores` / `users` rows (hash the password
-     with `password_hash($pw, PASSWORD_DEFAULT)`).
-   - Review Settings → Feature Management to enable/disable E-Load, GCash,
-     and Utang for your store.
+5. **Open the site**: visiting the domain for the first time redirects
+   automatically to `/install`. The wizard will:
+   - Test your database connection before letting you continue.
+   - Create all tables, default roles, and Feature Management defaults —
+     no SQL file to import.
+   - Walk you through creating the Owner account and basic store info.
+   - Show a live progress checklist (each item reflects a real completed
+     step, not a fake animation) and write `.env` + a `storage/installed.lock`
+     file for you at the end.
+   - Refuse to run again once installed — visiting `/install` afterward
+     shows an "already installed" page instead of letting anyone
+     reinstall or overwrite your data.
+6. **After installing**: review Settings → Feature Management to
+   enable/disable E-Load, GCash, and Utang for your store.
 7. **Backups**: Settings → Backup & Restore can download a data-only SQL
    backup at any time. To restore, use your hosting's phpMyAdmin import
    tool (safer than executing an arbitrary uploaded SQL file from within
@@ -131,6 +141,11 @@ request handling.
 - Disabling a feature (E-Load/GCash/Utang) in Feature Management hides it
   from navigation, POS, and the dashboard immediately, but never deletes
   historical data.
+- The `/install` wizard locks itself out permanently once setup completes
+  (`storage/installed.lock`) — every installer route re-checks that lock
+  before doing anything, so it can't be used to re-run setup or overwrite
+  existing data later. It writes `.env` only once, at the very end, and
+  never echoes the database password back to the browser.
 
 No system is "hackproof" — this follows a defense-in-depth approach
 appropriate for a small-business shared-hosting deployment, not a

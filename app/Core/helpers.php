@@ -47,6 +47,11 @@ function csrf_field(): string
     return Csrf::field();
 }
 
+function csrf_token(): string
+{
+    return Csrf::token();
+}
+
 function money(float|int|string $amount): string
 {
     return '₱' . number_format((float) $amount, 2);

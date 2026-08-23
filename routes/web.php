@@ -12,6 +12,7 @@ use Sukli\Controllers\EloadController;
 use Sukli\Controllers\ExpenseController;
 use Sukli\Controllers\GcashController;
 use Sukli\Controllers\IncomeController;
+use Sukli\Controllers\InstallController;
 use Sukli\Controllers\InventoryController;
 use Sukli\Controllers\PosController;
 use Sukli\Controllers\ReportController;
@@ -33,6 +34,23 @@ $ownerManager = RoleMiddleware::only(['owner', 'manager']);
 $eloadOn = FeatureMiddleware::require('eload');
 $gcashOn = FeatureMiddleware::require('gcash');
 $utangOn = FeatureMiddleware::require('utang');
+
+// -- Installer (public, self-contained — see app/Controllers/InstallController) --
+$router->get('/install', [InstallController::class, 'welcome']);
+$router->get('/install/database', [InstallController::class, 'showDatabase']);
+$router->post('/install/database', [InstallController::class, 'saveDatabase'], [$csrf]);
+$router->get('/install/admin', [InstallController::class, 'showAdmin']);
+$router->post('/install/admin', [InstallController::class, 'saveAdmin'], [$csrf]);
+$router->get('/install/store', [InstallController::class, 'showStore']);
+$router->post('/install/store', [InstallController::class, 'saveStore'], [$csrf]);
+$router->get('/install/finish', [InstallController::class, 'finish']);
+$router->post('/install/api/test-connection', [InstallController::class, 'apiTestConnection'], [$csrf]);
+$router->post('/install/api/check-requirements', [InstallController::class, 'apiCheckRequirements'], [$csrf]);
+$router->post('/install/api/connect', [InstallController::class, 'apiConnect'], [$csrf]);
+$router->post('/install/api/create-tables', [InstallController::class, 'apiCreateTables'], [$csrf]);
+$router->post('/install/api/create-admin', [InstallController::class, 'apiCreateAdmin'], [$csrf]);
+$router->post('/install/api/store-settings', [InstallController::class, 'apiStoreSettings'], [$csrf]);
+$router->post('/install/api/finalize', [InstallController::class, 'apiFinalize'], [$csrf]);
 
 // -- Auth ---------------------------------------------------------------
 $router->get('/', [DashboardController::class, 'index'], [$auth]);

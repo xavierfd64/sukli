@@ -1,0 +1,82 @@
+/* Sukli Installer — reuses app.css custom properties (--navy-900, --purple,
+   --green, etc.) for visual consistency; standalone rules only live here. */
+
+body.install-page {
+  margin: 0;
+  min-height: 100vh;
+  background: linear-gradient(160deg, var(--navy-900), var(--purple-dark));
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 40px 16px;
+}
+
+.install-shell { width: 100%; max-width: 640px; }
+
+.install-brand {
+  display: flex; align-items: center; gap: 10px; color: #fff; margin-bottom: 22px;
+  justify-content: center; text-align: left;
+}
+.install-brand .brand-icon { width: 38px; height: 38px; background: var(--green); border-radius: 10px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.install-brand strong { font-size: 18px; display: block; }
+.install-brand small { font-size: 12px; color: #cfd6e8; }
+
+.install-steps {
+  display: flex; justify-content: space-between; margin-bottom: 18px; padding: 0 6px;
+}
+.install-step { display: flex; flex-direction: column; align-items: center; gap: 6px; flex: 1; position: relative; }
+.install-step-dot {
+  width: 26px; height: 26px; border-radius: 50%; background: rgba(255,255,255,0.15);
+  color: #cfd6e8; display: flex; align-items: center; justify-content: center;
+  font-size: 12px; font-weight: 700;
+}
+.install-step-label { font-size: 10.5px; color: #cfd6e8; text-align: center; }
+.install-step.is-active .install-step-dot { background: var(--green); color: #fff; }
+.install-step.is-active .install-step-label { color: #fff; font-weight: 700; }
+.install-step.is-done .install-step-dot { background: #fff; color: var(--green-dark); }
+.install-step.is-done .install-step-label { color: #fff; }
+
+.install-card {
+  background: #fff; border-radius: 18px; padding: 32px 30px;
+  box-shadow: 0 20px 50px rgba(0,0,0,0.25);
+}
+@media (max-width: 480px) { .install-card { padding: 24px 20px; } }
+
+.install-card h2 { margin: 0 0 6px; font-size: 21px; }
+.install-card .install-lede { color: var(--text-muted); margin-bottom: 22px; font-size: 13.5px; }
+
+.install-icon-hero {
+  width: 60px; height: 60px; border-radius: 16px; background: var(--green);
+  color: #fff; display: flex; align-items: center; justify-content: center; margin: 0 auto 18px;
+}
+
+/* Progress bar */
+.install-progress-track {
+  height: 10px; border-radius: 999px; background: #eef0f6; overflow: hidden; margin: 18px 0;
+}
+.install-progress-fill {
+  height: 100%; background: linear-gradient(90deg, var(--green), var(--purple)); border-radius: 999px;
+  width: 0%; transition: width 0.35s ease;
+}
+
+/* Checklist */
+.install-checklist { list-style: none; margin: 0; padding: 0; }
+.install-checklist li {
+  display: flex; align-items: center; gap: 10px; padding: 9px 0; font-size: 13.5px;
+  color: var(--text-muted); border-bottom: 1px solid var(--border);
+}
+.install-checklist li:last-child { border-bottom: none; }
+.install-checklist .ic-status {
+  width: 22px; height: 22px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0; background: #eef0f6; color: var(--text-muted); font-size: 11px;
+}
+.install-checklist li.is-done { color: var(--text); }
+.install-checklist li.is-done .ic-status { background: #dcfce7; color: #15803d; }
+.install-checklist li.is-active .ic-status { background: #ede9fe; color: var(--purple); }
+.install-checklist li.is-active { color: var(--text); font-weight: 600; }
+.install-checklist li.is-error .ic-status { background: #fee2e2; color: #b91c1c; }
+.install-checklist li.is-error { color: #b91c1c; font-weight: 600; }
+
+.install-summary-row { display: flex; justify-content: space-between; padding: 7px 0; font-size: 13px; border-bottom: 1px solid var(--border); }
+.install-summary-row:last-child { border-bottom: none; }
+.install-summary-row span:first-child { color: var(--text-muted); }

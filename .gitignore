@@ -1,4 +1,5 @@
 /.env
+/storage/installed.lock
 /storage/logs/*.log
 /storage/cache/*
 .DS_Store

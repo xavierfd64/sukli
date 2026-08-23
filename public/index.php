@@ -21,6 +21,7 @@ spl_autoload_register(function (string $class): void {
 require __DIR__ . '/../app/Core/helpers.php';
 
 use Sukli\Core\Env;
+use Sukli\Core\Installer;
 use Sukli\Core\Session;
 use Sukli\Core\Request;
 use Sukli\Core\Router;
@@ -43,10 +44,19 @@ set_exception_handler(function (Throwable $e) use ($appConfig): void {
 
 Session::start();
 
+$request = new Request();
+
+// First-visit detection: send anyone to the installer until installed.lock
+// exists. This is the only place routing behavior differs based on install
+// state — every other route works exactly as before once installed.
+if (!Installer::isInstalled() && !str_starts_with($request->path(), '/install')) {
+    header('Location: ' . url('/install'));
+    exit;
+}
+
 $router = new Router();
 (function (Router $router) {
     require __DIR__ . '/../routes/web.php';
 })($router);
 
-$request = new Request();
 $router->dispatch($request);
