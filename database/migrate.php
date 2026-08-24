@@ -17,15 +17,20 @@ if (PHP_SAPI !== 'cli') {
     exit('This script may only be run from the command line.');
 }
 
+require __DIR__ . '/../app/Core/Installer.php';
 require __DIR__ . '/../app/Core/Env.php';
 
 Sukli\Core\Env::load(__DIR__ . '/../.env');
 
-$host = Sukli\Core\Env::get('DB_HOST', '127.0.0.1');
-$port = Sukli\Core\Env::get('DB_PORT', '3306');
-$database = Sukli\Core\Env::get('DB_DATABASE', 'sukli');
-$username = Sukli\Core\Env::get('DB_USERNAME', 'root');
-$password = Sukli\Core\Env::get('DB_PASSWORD', '');
+// Prefer config/installed.php (written by the /install wizard) over .env,
+// same precedence as config/database.php uses at runtime.
+$installedDb = Sukli\Core\Env::installed()['db'] ?? [];
+
+$host = $installedDb['host'] ?? Sukli\Core\Env::get('DB_HOST', '127.0.0.1');
+$port = $installedDb['port'] ?? Sukli\Core\Env::get('DB_PORT', '3306');
+$database = $installedDb['database'] ?? Sukli\Core\Env::get('DB_DATABASE', 'sukli');
+$username = $installedDb['username'] ?? Sukli\Core\Env::get('DB_USERNAME', 'root');
+$password = $installedDb['password'] ?? Sukli\Core\Env::get('DB_PASSWORD', '');
 
 $dsn = "mysql:host={$host};port={$port};charset=utf8mb4";
 

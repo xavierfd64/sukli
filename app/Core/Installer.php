@@ -22,9 +22,21 @@ class Installer
         return __DIR__ . '/../../storage/installed.lock';
     }
 
-    public static function envPath(): string
+    /**
+     * Where the installer writes its generated configuration. This is a
+     * PHP file (not a plain .env text file) on purpose: config/, app/,
+     * database/, and storage/ all now sit inside the same directory a web
+     * server serves directly (see README — the deployment structure is
+     * flat, no /public docroot required), so anything the installer writes
+     * must stay safe even if a host's .htaccess overrides don't apply.
+     * A .php file is always executed rather than served as text by any
+     * host that can run this app at all, so a bare `<?php return [...]`
+     * file never leaks its contents even with zero .htaccess protection —
+     * whereas a plain-text .env would be directly downloadable.
+     */
+    public static function configPath(): string
     {
-        return __DIR__ . '/../../.env';
+        return __DIR__ . '/../../config/installed.php';
     }
 
     public static function isInstalled(): bool

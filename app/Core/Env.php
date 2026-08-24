@@ -52,4 +52,21 @@ class Env
     {
         return self::$values[$key] ?? (getenv($key) !== false ? getenv($key) : $default);
     }
+
+    /**
+     * The installer-generated config (config/installed.php), if present.
+     * Preferred over .env by config/app.php and config/database.php — see
+     * Installer::configPath() for why it's a .php file rather than .env.
+     *
+     * @return array{db?: array, app?: array}
+     */
+    public static function installed(): array
+    {
+        static $config = null;
+        if ($config === null) {
+            $path = Installer::configPath();
+            $config = is_file($path) ? (require $path) : [];
+        }
+        return is_array($config) ? $config : [];
+    }
 }
