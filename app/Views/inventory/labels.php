@@ -1,44 +1,83 @@
 <?php
 /** @var array $products */
+/** @var array $preselected */
+/** @var array $paperSizes */
 ?>
-<div class="flex items-center justify-between mb-16 no-print">
+<div class="flex items-center justify-between mb-16" style="flex-wrap:wrap;gap:10px;">
     <div>
         <h2 style="margin:0;">Print Barcode Labels</h2>
-        <p class="text-muted" style="margin:0;"><?= count($products) ?> label(s)</p>
+        <p class="text-muted" style="margin:0;">Choose products, how many copies of each, and a paper size.</p>
     </div>
-    <div class="flex gap-8">
-        <a href="<?= url('/inventory') ?>" class="btn btn-outline">Back to Inventory</a>
-        <button type="button" class="btn btn-primary" onclick="window.print()">Print / Save as PDF</button>
-    </div>
+    <a href="<?= url('/inventory') ?>" class="btn btn-outline">Back to Inventory</a>
 </div>
 
-<div class="label-sheet">
-    <?php foreach ($products as $p): ?>
-        <div class="label-card">
-            <div class="label-name"><?= e($p['name']) ?></div>
-            <div class="label-price"><?= money($p['selling_price']) ?></div>
-            <?php if ($p['barcode']): ?>
-                <div class="label-barcode"><?= \Sukli\Services\BarcodeService::svg($p['barcode'], 2, 45) ?></div>
-            <?php else: ?>
-                <div class="label-barcode text-muted" style="font-size:11px;">No barcode assigned — edit this product to generate one.</div>
-            <?php endif; ?>
+<form method="post" action="<?= url('/inventory/labels/print') ?>" target="_blank" id="labels-config-form">
+    <?= csrf_field() ?>
+
+    <div class="card mb-16">
+        <div class="flex gap-12" style="flex-wrap:wrap;align-items:flex-end;">
+            <div class="form-group" style="margin:0;flex:1;min-width:220px;">
+                <label>Search products</label>
+                <input type="text" class="form-control" id="labels-search" placeholder="Filter by product name...">
+            </div>
+            <div class="form-group" style="margin:0;">
+                <label>Paper Size</label>
+                <select class="form-control" name="paper_size">
+                    <?php foreach ($paperSizes as $key => $label): ?>
+                        <option value="<?= e($key) ?>"><?= e($label) ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+            <div class="form-group" style="margin:0;">
+                <label>&nbsp;</label>
+                <button type="submit" class="btn btn-primary btn-block"><?= icon('barcode', 16) ?> Generate Labels</button>
+            </div>
         </div>
-    <?php endforeach; ?>
-    <?php if (!$products): ?><p class="text-muted">No products to print.</p><?php endif; ?>
-</div>
+    </div>
 
-<style>
-.label-sheet { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
-.label-card { border: 1px dashed var(--border); border-radius: 8px; padding: 10px; text-align: center; background: #fff; }
-.label-name { font-size: 12px; font-weight: 700; margin-bottom: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.label-price { font-size: 13px; font-weight: 700; color: var(--green-dark); margin-bottom: 4px; }
-.label-barcode svg { max-width: 100%; height: auto; }
+    <div class="card">
+        <div class="table-wrap">
+            <table class="table" id="labels-table">
+                <thead>
+                    <tr>
+                        <th style="width:36px;"><input type="checkbox" id="labels-select-all"></th>
+                        <th>Product</th>
+                        <th>Barcode</th>
+                        <th style="width:120px;">Quantity</th>
+                    </tr>
+                </thead>
+                <tbody>
+                <?php foreach ($products as $p): $checked = in_array((int) $p['id'], $preselected, true); ?>
+                    <tr data-name="<?= e(strtolower($p['name'])) ?>">
+                        <td><input type="checkbox" class="labels-row-check" name="selected[<?= (int) $p['id'] ?>]" value="1" <?= $checked ? 'checked' : '' ?>></td>
+                        <td><?= e($p['name']) ?></td>
+                        <td class="text-muted"><?= e($p['barcode'] ?: 'No barcode assigned') ?></td>
+                        <td><input type="number" class="form-control form-control-sm" name="quantity[<?= (int) $p['id'] ?>]" value="1" min="1" max="500" style="width:90px;"></td>
+                    </tr>
+                <?php endforeach; ?>
+                <?php if (!$products): ?><tr><td colspan="4" class="text-muted">No active products yet.</td></tr><?php endif; ?>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</form>
 
-@media print {
-    .sidebar, .topbar, .bottom-nav, .no-print { display: none !important; }
-    .main { margin-left: 0 !important; }
-    body { background: #fff; }
-    .label-sheet { grid-template-columns: repeat(3, 1fr); }
-    .label-card { break-inside: avoid; border: 1px solid #000; }
-}
-</style>
+<script>
+(function () {
+    var search = document.getElementById('labels-search');
+    search.addEventListener('input', function () {
+        var q = search.value.trim().toLowerCase();
+        document.querySelectorAll('#labels-table tbody tr[data-name]').forEach(function (row) {
+            row.style.display = row.dataset.name.indexOf(q) === -1 ? 'none' : '';
+        });
+    });
+
+    var selectAll = document.getElementById('labels-select-all');
+    selectAll.addEventListener('change', function () {
+        document.querySelectorAll('.labels-row-check').forEach(function (cb) {
+            var row = cb.closest('tr');
+            if (row.style.display !== 'none') cb.checked = selectAll.checked;
+        });
+    });
+})();
+</script>

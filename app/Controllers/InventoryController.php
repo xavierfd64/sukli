@@ -16,6 +16,15 @@ use Sukli\Services\UploadService;
 
 class InventoryController extends Controller
 {
+    /** CSS @page size keyword => human label. Architecture leaves room for custom label sizes later without changing this shape. */
+    private const PAPER_SIZES = [
+        'a4' => 'A4',
+        'letter' => 'Letter',
+        'legal' => 'Legal',
+    ];
+
+    private const MAX_COPIES_PER_PRODUCT = 500;
+
     public function index(Request $request): void
     {
         $storeId = Auth::storeId();
@@ -211,28 +220,65 @@ class InventoryController extends Controller
         $this->redirect('/inventory');
     }
 
+    /** Step 1: choose which product(s), how many copies of each, and a paper size — before anything is generated. */
     public function labels(Request $request): void
     {
         $storeId = Auth::storeId();
         $idsParam = $request->trimmed('ids');
-        $ids = array_filter(array_map('intval', explode(',', $idsParam)));
+        $preselected = array_filter(array_map('intval', explode(',', $idsParam)));
 
-        if ($ids) {
-            $placeholders = implode(',', array_fill(0, count($ids), '?'));
-            $products = Database::all(
-                "SELECT id, name, barcode, selling_price FROM products WHERE store_id = ? AND id IN ({$placeholders}) ORDER BY name",
-                array_merge([$storeId], $ids)
-            );
-        } else {
-            $products = Database::all(
-                "SELECT id, name, barcode, selling_price FROM products WHERE store_id = ? AND status = 'active' ORDER BY name",
-                [$storeId]
-            );
-        }
+        $products = Database::all(
+            "SELECT id, name, barcode, selling_price FROM products WHERE store_id = ? AND status = 'active' ORDER BY name",
+            [$storeId]
+        );
 
         $this->view('inventory/labels', [
             'pageTitle' => 'Print Barcode Labels',
             'products' => $products,
+            'preselected' => $preselected,
+            'paperSizes' => self::PAPER_SIZES,
+        ]);
+    }
+
+    /** Step 2: the actual printable sheet — repeats each product per its chosen quantity, sized to the chosen paper. */
+    public function generateLabels(Request $request): void
+    {
+        $storeId = Auth::storeId();
+        $selected = array_keys(array_filter((array) $request->input('selected', [])));
+        $ids = array_values(array_filter(array_map('intval', $selected)));
+        $quantities = (array) $request->input('quantity', []);
+        $paperSize = $request->trimmed('paper_size') ?: 'a4';
+        if (!array_key_exists($paperSize, self::PAPER_SIZES)) {
+            $paperSize = 'a4';
+        }
+
+        if (!$ids) {
+            Session::flash('error', 'Select at least one product to print.');
+            $this->back('/inventory/labels');
+        }
+
+        $placeholders = implode(',', array_fill(0, count($ids), '?'));
+        $products = Database::all(
+            "SELECT id, name, barcode, selling_price FROM products WHERE store_id = ? AND id IN ({$placeholders}) ORDER BY name",
+            array_merge([$storeId], $ids)
+        );
+
+        // Quantities are re-validated here (not trusted from the form) — every
+        // product name/price/barcode is re-fetched from the DB by ID above,
+        // so nothing in this printed sheet can be tampered with client-side.
+        $labels = [];
+        foreach ($products as $product) {
+            $qty = max(1, min(self::MAX_COPIES_PER_PRODUCT, (int) ($quantities[$product['id']] ?? 1)));
+            for ($n = 0; $n < $qty; $n++) {
+                $labels[] = $product;
+            }
+        }
+
+        $this->view('inventory/labels-print', [
+            'pageTitle' => 'Barcode Labels',
+            'labels' => $labels,
+            'paperSize' => $paperSize,
+            'paperSizes' => self::PAPER_SIZES,
         ]);
     }
 

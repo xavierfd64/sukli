@@ -73,6 +73,7 @@ $router->get('/inventory', [InventoryController::class, 'index'], [$auth, $perm(
 $router->get('/inventory/create', [InventoryController::class, 'create'], [$auth, $perm('inventory', 'add')]);
 $router->post('/inventory', [InventoryController::class, 'store'], [$auth, $perm('inventory', 'add'), $csrf]);
 $router->get('/inventory/labels', [InventoryController::class, 'labels'], [$auth, $perm('inventory', 'edit')]);
+$router->post('/inventory/labels/print', [InventoryController::class, 'generateLabels'], [$auth, $perm('inventory', 'edit'), $csrf]);
 $router->get('/inventory/export.csv', [InventoryController::class, 'exportCsv'], [$auth, $perm('inventory', 'edit')]);
 $router->get('/inventory/categories', [InventoryController::class, 'categories'], [$auth, $perm('inventory', 'edit')]);
 $router->post('/inventory/categories', [InventoryController::class, 'storeCategory'], [$auth, $perm('inventory', 'edit'), $csrf]);
