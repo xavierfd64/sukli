@@ -261,10 +261,13 @@ class InventoryController extends Controller
     {
         $name = $request->trimmed('name');
         if ($name !== '') {
+            $storeId = Auth::storeId();
             Database::execute(
                 "INSERT INTO product_categories (store_id, name) VALUES (?, ?) ON DUPLICATE KEY UPDATE name = VALUES(name)",
-                [Auth::storeId(), $name]
+                [$storeId, $name]
             );
+            $category = Database::one("SELECT id FROM product_categories WHERE store_id = ? AND name = ?", [$storeId, $name]);
+            AuditService::log('create', 'inventory', 'product_category', (int) ($category['id'] ?? 0), null, ['name' => $name]);
             Session::flash('success', 'Category saved.');
         }
         $this->back('/inventory');

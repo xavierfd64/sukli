@@ -55,6 +55,7 @@ class SupplierController extends Controller
         if ($request->input('_action') === 'toggle_status') {
             $newStatus = $existing['status'] === 'active' ? 'inactive' : 'active';
             Database::execute("UPDATE suppliers SET status = ? WHERE id = ?", [$newStatus, $id]);
+            AuditService::log($newStatus === 'active' ? 'restore' : 'archive', 'suppliers', 'supplier', $id);
             Session::flash('success', 'Supplier status updated.');
             $this->back('/suppliers');
         }

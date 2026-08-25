@@ -136,6 +136,7 @@ class CustomerController extends Controller
             $current = Database::one("SELECT status FROM customers WHERE id = ?", [$id]);
             $newStatus = $current['status'] === 'active' ? 'inactive' : 'active';
             Database::execute("UPDATE customers SET status = ? WHERE id = ?", [$newStatus, $id]);
+            AuditService::log($newStatus === 'active' ? 'restore' : 'archive', 'customers', 'customer', $id);
             Session::flash('success', 'Customer status updated.');
             $this->back('/customers');
         }

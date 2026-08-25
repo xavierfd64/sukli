@@ -73,13 +73,13 @@ $router->get('/inventory', [InventoryController::class, 'index'], [$auth, $perm(
 $router->get('/inventory/create', [InventoryController::class, 'create'], [$auth, $perm('inventory', 'add')]);
 $router->post('/inventory', [InventoryController::class, 'store'], [$auth, $perm('inventory', 'add'), $csrf]);
 $router->get('/inventory/labels', [InventoryController::class, 'labels'], [$auth, $perm('inventory', 'edit')]);
+$router->get('/inventory/export.csv', [InventoryController::class, 'exportCsv'], [$auth, $perm('inventory', 'edit')]);
+$router->post('/inventory/categories', [InventoryController::class, 'storeCategory'], [$auth, $perm('inventory', 'edit'), $csrf]);
+$router->post('/inventory/import', [InventoryController::class, 'importCsv'], [$auth, $perm('inventory', 'edit'), $csrf]);
 $router->get('/inventory/{id}/edit', [InventoryController::class, 'edit'], [$auth, $perm('inventory', 'edit')]);
 $router->post('/inventory/{id}', [InventoryController::class, 'update'], [$auth, $perm('inventory', 'edit'), $csrf]);
 $router->post('/inventory/{id}/archive', [InventoryController::class, 'archive'], [$auth, $perm('inventory', 'delete'), $csrf]);
 $router->post('/inventory/{id}/adjust', [InventoryController::class, 'adjustStock'], [$auth, $perm('inventory', 'edit'), $csrf]);
-$router->post('/inventory/categories', [InventoryController::class, 'storeCategory'], [$auth, $perm('inventory', 'edit'), $csrf]);
-$router->get('/inventory/export.csv', [InventoryController::class, 'exportCsv'], [$auth, $perm('inventory', 'edit')]);
-$router->post('/inventory/import', [InventoryController::class, 'importCsv'], [$auth, $perm('inventory', 'edit'), $csrf]);
 
 // -- Income / Expenses --------------------------------------------------------
 $router->get('/income', [IncomeController::class, 'index'], [$auth, $perm('income', 'view')]);
