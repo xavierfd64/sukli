@@ -3,7 +3,6 @@
 /** @var array $categories */
 /** @var array $customers */
 /** @var array $paymentMethods */
-/** @var bool $autoPrintReceipt */
 ?>
 <div class="pos-layout">
     <div class="pos-products">

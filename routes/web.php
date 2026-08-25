@@ -126,6 +126,8 @@ $router->get('/settings', [SettingsController::class, 'index'], [$auth, $ownerOn
 $router->post('/settings/general', [SettingsController::class, 'updateGeneral'], [$auth, $ownerOnly, $csrf]);
 $router->get('/settings/features', [SettingsController::class, 'features'], [$auth, $ownerOnly]);
 $router->post('/settings/features', [SettingsController::class, 'updateFeatures'], [$auth, $ownerOnly, $csrf]);
+$router->get('/settings/payment-methods', [SettingsController::class, 'paymentMethods'], [$auth, $ownerOnly]);
+$router->post('/settings/payment-methods', [SettingsController::class, 'updatePaymentMethods'], [$auth, $ownerOnly, $csrf]);
 $router->post('/settings/security', [SettingsController::class, 'updateSecurity'], [$auth, $ownerOnly, $csrf]);
 $router->get('/settings/backup', [SettingsController::class, 'downloadBackup'], [$auth, $ownerOnly]);
 

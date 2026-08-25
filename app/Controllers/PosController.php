@@ -13,6 +13,7 @@ use Sukli\Services\AuditService;
 use Sukli\Services\CustomerSearchService;
 use Sukli\Services\PaymentMethodService;
 use Sukli\Services\StockService;
+use Sukli\Services\SystemSettingsService;
 use Sukli\Services\UtangService;
 
 class PosController extends Controller
@@ -45,18 +46,12 @@ class PosController extends Controller
             'contact_number' => $c['contact_number'],
         ], $customerRows);
 
-        $autoPrintRow = Database::one(
-            "SELECT setting_value FROM system_settings WHERE store_id = ? AND setting_key = 'auto_print_receipt'",
-            [$storeId]
-        );
-
         $this->view('pos/index', [
             'pageTitle' => 'POS',
             'products' => $products,
             'categories' => array_keys($categories),
             'customers' => $customers,
             'paymentMethods' => PaymentMethodService::enabled((int) $storeId),
-            'autoPrintReceipt' => (bool) ($autoPrintRow['setting_value'] ?? false),
         ]);
     }
 
@@ -229,10 +224,6 @@ class PosController extends Controller
         $items = Database::all("SELECT * FROM sale_items WHERE sale_id = ?", [$id]);
         $payments = Database::all("SELECT * FROM payments WHERE sale_id = ? ORDER BY id", [$id]);
         $store = Database::one("SELECT * FROM stores WHERE id = ?", [$storeId]);
-        $autoPrintRow = Database::one(
-            "SELECT setting_value FROM system_settings WHERE store_id = ? AND setting_key = 'auto_print_receipt'",
-            [$storeId]
-        );
 
         $this->view('pos/receipt', [
             'pageTitle' => 'Receipt #' . $sale['sale_number'],
@@ -240,7 +231,7 @@ class PosController extends Controller
             'items' => $items,
             'payments' => $payments,
             'store' => $store,
-            'autoPrintReceipt' => (bool) ($autoPrintRow['setting_value'] ?? false),
+            'autoPrintReceipt' => SystemSettingsService::getBool((int) $storeId, 'auto_print_receipt'),
         ]);
     }
 }

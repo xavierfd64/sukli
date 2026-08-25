@@ -3,6 +3,7 @@
 /** @var array $categories */
 /** @var array $summary */
 /** @var string $phpVersion */
+/** @var bool $autoPrintReceipt */
 ?>
 <h2 style="margin-top:0;">Settings</h2>
 <p class="text-muted">Manage your store, system preferences and more.</p>
@@ -17,6 +18,16 @@
                 <div class="text-muted" style="font-size:12.5px;">Enable or disable features like E-Load, GCash and Utang. Control visibility in POS and Dashboard.</div>
             </div>
             <a href="<?= url('/settings/features') ?>" class="btn btn-purple">Manage Features <?= icon('chevron-right', 14) ?></a>
+        </div>
+    </div>
+
+    <div class="card mb-16" style="border-left:4px solid var(--green);">
+        <div class="flex items-center justify-between" style="flex-wrap:wrap;gap:10px;">
+            <div>
+                <div class="card-title" style="margin:0;">Payment Methods</div>
+                <div class="text-muted" style="font-size:12.5px;">Enable or disable Cash, GCash, Utang, E-Wallet, Bank Transfer and Other for POS and split payments.</div>
+            </div>
+            <a href="<?= url('/settings/payment-methods') ?>" class="btn btn-outline">Manage Payment Methods <?= icon('chevron-right', 14) ?></a>
         </div>
     </div>
 
@@ -44,6 +55,10 @@
                 <div class="form-hint">Used for "today", reports, and all recorded timestamps throughout Sukli.</div>
             </div>
             <div class="form-group"><label>Receipt Footer</label><input class="form-control" name="receipt_footer" value="<?= e($store['receipt_footer'] ?? '') ?>"></div>
+            <label class="flex items-center gap-8 mb-16" style="font-weight:500;">
+                <input type="checkbox" name="auto_print_receipt" value="1" <?= $autoPrintReceipt ? 'checked' : '' ?> style="width:18px;height:18px;">
+                Auto Print Receipt after checkout
+            </label>
             <button type="submit" class="btn btn-primary">Save General Settings</button>
         </form>
     </div>

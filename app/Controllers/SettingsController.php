@@ -11,6 +11,8 @@ use Sukli\Core\Request;
 use Sukli\Core\Session;
 use Sukli\Services\AuditService;
 use Sukli\Services\FeatureService;
+use Sukli\Services\PaymentMethodService;
+use Sukli\Services\SystemSettingsService;
 use Sukli\Services\TimezoneService;
 
 class SettingsController extends Controller
@@ -36,6 +38,7 @@ class SettingsController extends Controller
             'summary' => $summary,
             'phpVersion' => PHP_VERSION,
             'timezones' => TimezoneService::all(),
+            'autoPrintReceipt' => SystemSettingsService::getBool((int) $storeId, 'auto_print_receipt'),
         ]);
     }
 
@@ -58,9 +61,41 @@ class SettingsController extends Controller
             ]
         );
 
-        AuditService::log('update', 'settings', 'store', $storeId, $existing, $request->only(['name', 'address', 'phone', 'currency_symbol', 'tax_rate', 'receipt_footer', 'timezone']));
+        $autoPrint = $request->input('auto_print_receipt') === '1';
+        SystemSettingsService::set((int) $storeId, 'auto_print_receipt', $autoPrint ? '1' : '0');
+
+        AuditService::log('update', 'settings', 'store', $storeId, $existing, $request->only(['name', 'address', 'phone', 'currency_symbol', 'tax_rate', 'receipt_footer', 'timezone']) + ['auto_print_receipt' => $autoPrint]);
         Session::flash('success', 'Store settings updated.');
         $this->redirect('/settings');
+    }
+
+    public function paymentMethods(Request $request): void
+    {
+        $storeId = (int) Auth::storeId();
+        $this->view('settings/payment-methods', [
+            'pageTitle' => 'Payment Methods',
+            'methods' => PaymentMethodService::all($storeId),
+        ]);
+    }
+
+    public function updatePaymentMethods(Request $request): void
+    {
+        $storeId = (int) Auth::storeId();
+        $input = $request->input('methods', []);
+        if (!is_array($input)) {
+            $input = [];
+        }
+
+        foreach (PaymentMethodService::KEYS as $key) {
+            $row = $input[$key] ?? [];
+            $enabled = ($row['enabled'] ?? '') === '1';
+            $name = trim((string) ($row['name'] ?? '')) ?: ucfirst($key);
+            PaymentMethodService::update($storeId, $key, $enabled, $name);
+        }
+
+        AuditService::log('update', 'settings', 'payment_methods', $storeId, null, $input);
+        Session::flash('success', 'Payment method settings saved.');
+        $this->redirect('/settings/payment-methods');
     }
 
     public function features(Request $request): void
