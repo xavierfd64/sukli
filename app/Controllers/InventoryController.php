@@ -257,20 +257,85 @@ class InventoryController extends Controller
         $this->back('/inventory');
     }
 
+    public function categories(Request $request): void
+    {
+        $storeId = Auth::storeId();
+        $categories = Database::all(
+            "SELECT c.*, (SELECT COUNT(*) FROM products p WHERE p.category_id = c.id) AS product_count
+             FROM product_categories c WHERE c.store_id = ? ORDER BY c.name",
+            [$storeId]
+        );
+        $this->view('inventory/categories', [
+            'pageTitle' => 'Product Categories',
+            'categories' => $categories,
+        ]);
+    }
+
     public function storeCategory(Request $request): void
     {
         $name = $request->trimmed('name');
-        if ($name !== '') {
-            $storeId = Auth::storeId();
-            Database::execute(
-                "INSERT INTO product_categories (store_id, name) VALUES (?, ?) ON DUPLICATE KEY UPDATE name = VALUES(name)",
-                [$storeId, $name]
-            );
-            $category = Database::one("SELECT id FROM product_categories WHERE store_id = ? AND name = ?", [$storeId, $name]);
-            AuditService::log('create', 'inventory', 'product_category', (int) ($category['id'] ?? 0), null, ['name' => $name]);
-            Session::flash('success', 'Category saved.');
+        if ($name === '') {
+            Session::flash('error', 'Enter a category name.');
+            $this->back('/inventory/categories');
         }
-        $this->back('/inventory');
+
+        $storeId = Auth::storeId();
+        $existing = Database::one("SELECT id FROM product_categories WHERE store_id = ? AND name = ?", [$storeId, $name]);
+        if ($existing) {
+            Session::flash('error', 'A category with that name already exists.');
+            $this->back('/inventory/categories');
+        }
+
+        Database::execute("INSERT INTO product_categories (store_id, name) VALUES (?, ?)", [$storeId, $name]);
+        $id = (int) Database::lastInsertId();
+        AuditService::log('create', 'inventory', 'product_category', $id, null, ['name' => $name]);
+        Session::flash('success', 'Category added.');
+        $this->back('/inventory/categories');
+    }
+
+    public function updateCategory(Request $request): void
+    {
+        $id = (int) $request->param('id');
+        $storeId = Auth::storeId();
+        $existing = Database::one("SELECT id, name FROM product_categories WHERE id = ? AND store_id = ?", [$id, $storeId]);
+        if (!$existing) {
+            Session::flash('error', 'Category not found.');
+            $this->back('/inventory/categories');
+        }
+
+        $name = $request->trimmed('name');
+        if ($name === '') {
+            Session::flash('error', 'Enter a category name.');
+            $this->back('/inventory/categories');
+        }
+
+        $duplicate = Database::one("SELECT id FROM product_categories WHERE store_id = ? AND name = ? AND id != ?", [$storeId, $name, $id]);
+        if ($duplicate) {
+            Session::flash('error', 'A category with that name already exists.');
+            $this->back('/inventory/categories');
+        }
+
+        Database::execute("UPDATE product_categories SET name = ? WHERE id = ? AND store_id = ?", [$name, $id, $storeId]);
+        AuditService::log('update', 'inventory', 'product_category', $id, $existing, ['name' => $name]);
+        Session::flash('success', 'Category updated.');
+        $this->back('/inventory/categories');
+    }
+
+    public function deleteCategory(Request $request): void
+    {
+        $id = (int) $request->param('id');
+        $storeId = Auth::storeId();
+        $existing = Database::one("SELECT id, name FROM product_categories WHERE id = ? AND store_id = ?", [$id, $storeId]);
+        if (!$existing) {
+            Session::flash('error', 'Category not found.');
+            $this->back('/inventory/categories');
+        }
+
+        // products.category_id has ON DELETE SET NULL — affected products become Uncategorized, nothing is lost.
+        Database::execute("DELETE FROM product_categories WHERE id = ? AND store_id = ?", [$id, $storeId]);
+        AuditService::log('delete', 'inventory', 'product_category', $id, $existing);
+        Session::flash('success', 'Category deleted.');
+        $this->back('/inventory/categories');
     }
 
     public function exportCsv(Request $request): void

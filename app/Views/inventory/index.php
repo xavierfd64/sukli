@@ -31,6 +31,7 @@ function stock_badge(array $p): string
         <button type="button" class="btn btn-outline" data-modal-target="#import-modal"><?= icon('archive', 16) ?> Import</button>
         <a href="<?= url('/inventory/export.csv?' . http_build_query(['q' => $search])) ?>" class="btn btn-outline"><?= icon('reports', 16) ?> Export</a>
         <a href="<?= url('/inventory/labels') ?>" class="btn btn-outline" target="_blank"><?= icon('barcode', 16) ?> Print Labels</a>
+        <a href="<?= url('/inventory/categories') ?>" class="btn btn-outline"><?= icon('settings', 16) ?> Categories</a>
         <?php endif; ?>
         <?php if ($canAdd): ?>
         <a href="<?= url('/inventory/create') ?>" class="btn btn-primary"><?= icon('plus', 16) ?> Add Product</a>

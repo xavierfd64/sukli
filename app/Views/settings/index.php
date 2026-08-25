@@ -179,17 +179,17 @@
     </div>
 
     <div class="card mb-16">
-        <div class="card-title">Categories</div>
-        <div class="card-subtitle">Manage product categories</div>
-        <div class="flex gap-8 mb-16" style="flex-wrap:wrap;">
-            <?php foreach ($categories as $c): ?><span class="badge badge-blue"><?= e($c['name']) ?></span><?php endforeach; ?>
-            <?php if (!$categories): ?><span class="text-muted">No categories yet.</span><?php endif; ?>
+        <div class="flex items-center justify-between" style="flex-wrap:wrap;gap:10px;">
+            <div>
+                <div class="card-title" style="margin:0;">Product Categories</div>
+                <div class="text-muted" style="font-size:12.5px;">Add, rename, or remove the categories used across Inventory.</div>
+                <div class="flex gap-8 mt-8" style="flex-wrap:wrap;">
+                    <?php foreach ($categories as $c): ?><span class="badge badge-blue"><?= e($c['name']) ?></span><?php endforeach; ?>
+                    <?php if (!$categories): ?><span class="text-muted">No categories yet.</span><?php endif; ?>
+                </div>
+            </div>
+            <a href="<?= url('/inventory/categories') ?>" class="btn btn-outline">Manage Categories <?= icon('chevron-right', 14) ?></a>
         </div>
-        <form method="post" action="<?= url('/inventory/categories') ?>" class="flex gap-8">
-            <?= csrf_field() ?>
-            <input class="form-control" name="name" placeholder="New category name" required>
-            <button type="submit" class="btn btn-outline">Add</button>
-        </form>
     </div>
 
     <div class="card mb-16">

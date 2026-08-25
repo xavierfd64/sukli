@@ -74,7 +74,10 @@ $router->get('/inventory/create', [InventoryController::class, 'create'], [$auth
 $router->post('/inventory', [InventoryController::class, 'store'], [$auth, $perm('inventory', 'add'), $csrf]);
 $router->get('/inventory/labels', [InventoryController::class, 'labels'], [$auth, $perm('inventory', 'edit')]);
 $router->get('/inventory/export.csv', [InventoryController::class, 'exportCsv'], [$auth, $perm('inventory', 'edit')]);
+$router->get('/inventory/categories', [InventoryController::class, 'categories'], [$auth, $perm('inventory', 'edit')]);
 $router->post('/inventory/categories', [InventoryController::class, 'storeCategory'], [$auth, $perm('inventory', 'edit'), $csrf]);
+$router->post('/inventory/categories/{id}', [InventoryController::class, 'updateCategory'], [$auth, $perm('inventory', 'edit'), $csrf]);
+$router->post('/inventory/categories/{id}/delete', [InventoryController::class, 'deleteCategory'], [$auth, $perm('inventory', 'edit'), $csrf]);
 $router->post('/inventory/import', [InventoryController::class, 'importCsv'], [$auth, $perm('inventory', 'edit'), $csrf]);
 $router->get('/inventory/{id}/edit', [InventoryController::class, 'edit'], [$auth, $perm('inventory', 'edit')]);
 $router->post('/inventory/{id}', [InventoryController::class, 'update'], [$auth, $perm('inventory', 'edit'), $csrf]);
