@@ -5,6 +5,7 @@
 /storage/cache/*
 /storage/uploads/*
 !/storage/uploads/.gitkeep
+!/storage/uploads/.htaccess
 .DS_Store
 Thumbs.db
 *.swp
