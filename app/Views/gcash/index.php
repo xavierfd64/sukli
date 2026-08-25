@@ -5,6 +5,8 @@
 /** @var float $serviceCharges */
 /** @var string $from */
 /** @var string $to */
+/** @var array $customers */
+/** @var array $brackets */
 ?>
 <div class="flex items-center justify-between mb-16" style="flex-wrap:wrap;gap:10px;">
     <div>
@@ -52,7 +54,7 @@
 <div class="modal-backdrop" id="add-gcash">
     <div class="modal">
         <h3>Add GCash Transaction</h3>
-        <form method="post" action="<?= url('/gcash') ?>">
+        <form method="post" action="<?= url('/gcash') ?>" id="gcash-form">
             <?= csrf_field() ?>
             <div class="form-group">
                 <label>Type</label>
@@ -62,12 +64,65 @@
                 </select>
             </div>
             <div class="form-row">
-                <div class="form-group"><label>Amount</label><input class="form-control" type="number" step="0.01" min="0.01" name="amount" required></div>
-                <div class="form-group"><label>Service Charge</label><input class="form-control" type="number" step="0.01" min="0" name="service_charge" value="0"></div>
+                <div class="form-group"><label>Amount</label><input class="form-control" type="number" step="0.01" min="0.01" name="amount" id="gcash-amount" required></div>
+                <div class="form-group">
+                    <label>Service Charge</label>
+                    <input class="form-control" type="number" step="0.01" min="0" name="service_charge" id="gcash-service-charge" value="0">
+                    <div class="form-hint" id="gcash-charge-hint"></div>
+                </div>
             </div>
-            <div class="form-group"><label>Customer / Reference</label><input class="form-control" name="customer_reference"></div>
+            <div class="form-group">
+                <label>Customer / Reference</label>
+                <input type="text" id="gcash-customer-search" class="form-control" placeholder="Search customer, or leave blank" autocomplete="off">
+                <div id="gcash-customer-results" class="pos-customer-results"></div>
+                <div id="gcash-customer-selected"></div>
+                <input type="hidden" name="customer_reference" id="gcash-customer-reference">
+            </div>
             <div class="form-group"><label>Notes</label><input class="form-control" name="notes"></div>
             <div class="flex gap-8"><button type="button" class="btn btn-outline btn-block" data-modal-close>Cancel</button><button class="btn btn-primary btn-block">Save</button></div>
         </form>
     </div>
 </div>
+
+<script src="<?= asset('js/customer-picker.js') ?>"></script>
+<script>
+(function () {
+    var brackets = <?= json_encode($brackets) ?>;
+    var amountInput = document.getElementById('gcash-amount');
+    var chargeInput = document.getElementById('gcash-service-charge');
+    var chargeHint = document.getElementById('gcash-charge-hint');
+    var chargeTouched = false;
+
+    function suggestedCharge(amount) {
+        for (var i = 0; i < brackets.length; i++) {
+            var b = brackets[i];
+            var min = parseFloat(b.min_amount);
+            var max = b.max_amount === null ? null : parseFloat(b.max_amount);
+            if (amount >= min && (max === null || amount <= max)) return parseFloat(b.charge);
+        }
+        return null;
+    }
+
+    amountInput.addEventListener('input', function () {
+        var amount = parseFloat(amountInput.value) || 0;
+        var suggested = suggestedCharge(amount);
+        if (suggested === null) {
+            chargeHint.textContent = '';
+            return;
+        }
+        chargeHint.textContent = 'Suggested charge for this amount: ₱' + suggested.toFixed(2);
+        if (!chargeTouched) chargeInput.value = suggested.toFixed(2);
+    });
+    chargeInput.addEventListener('input', function () { chargeTouched = true; });
+
+    var refHidden = document.getElementById('gcash-customer-reference');
+    SukliCustomerPicker({
+        input: document.getElementById('gcash-customer-search'),
+        results: document.getElementById('gcash-customer-results'),
+        selected: document.getElementById('gcash-customer-selected'),
+        customers: <?= json_encode($customers) ?>,
+        onSelect: function (c) { refHidden.value = c.name; },
+        onClear: function () { refHidden.value = ''; },
+    });
+})();
+</script>

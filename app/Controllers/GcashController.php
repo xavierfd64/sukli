@@ -10,6 +10,8 @@ use Sukli\Core\Database;
 use Sukli\Core\Request;
 use Sukli\Core\Session;
 use Sukli\Services\AuditService;
+use Sukli\Services\CustomerSearchService;
+use Sukli\Services\GcashChargeBracketService;
 
 class GcashController extends Controller
 {
@@ -29,6 +31,16 @@ class GcashController extends Controller
         $cashOut = array_sum(array_map(fn ($r) => $r['type'] === 'cash_out' ? (float) $r['amount'] : 0, $records));
         $serviceCharges = array_sum(array_column($records, 'service_charge'));
 
+        $customerRows = Database::all(
+            "SELECT id, first_name, last_name, contact_number FROM customers WHERE store_id = ? AND status = 'active' ORDER BY first_name, last_name",
+            [$storeId]
+        );
+        $customers = array_map(static fn (array $c) => [
+            'id' => (int) $c['id'],
+            'name' => CustomerSearchService::fullName($c),
+            'contact_number' => $c['contact_number'],
+        ], $customerRows);
+
         $this->view('gcash/index', [
             'pageTitle' => 'GCash Cash-In / Cash-Out',
             'records' => $records,
@@ -37,6 +49,8 @@ class GcashController extends Controller
             'serviceCharges' => $serviceCharges,
             'from' => $from,
             'to' => $to,
+            'customers' => $customers,
+            'brackets' => GcashChargeBracketService::all((int) $storeId),
         ]);
     }
 

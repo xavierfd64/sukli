@@ -11,6 +11,7 @@ use Sukli\Core\Request;
 use Sukli\Core\Session;
 use Sukli\Services\AuditService;
 use Sukli\Services\FeatureService;
+use Sukli\Services\GcashChargeBracketService;
 use Sukli\Services\NetworkService;
 use Sukli\Services\PaymentMethodService;
 use Sukli\Services\SystemSettingsService;
@@ -135,6 +136,44 @@ class SettingsController extends Controller
         AuditService::log('update', 'settings', 'network', $id);
         Session::flash('success', 'Network updated.');
         $this->back('/settings/networks');
+    }
+
+    public function gcashBrackets(Request $request): void
+    {
+        $storeId = (int) Auth::storeId();
+        $this->view('settings/gcash-brackets', [
+            'pageTitle' => 'GCash Charge Brackets',
+            'brackets' => GcashChargeBracketService::all($storeId),
+        ]);
+    }
+
+    public function storeGcashBracket(Request $request): void
+    {
+        $storeId = (int) Auth::storeId();
+        $min = (float) $request->input('min_amount', 0);
+        $maxRaw = $request->trimmed('max_amount');
+        $max = $maxRaw !== '' && $maxRaw !== null ? (float) $maxRaw : null;
+        $charge = (float) $request->input('charge', 0);
+
+        if ($min < 0 || $charge < 0 || ($max !== null && $max < $min)) {
+            Session::flash('error', 'Enter a valid amount range and charge.');
+            $this->back('/settings/gcash-brackets');
+        }
+
+        GcashChargeBracketService::create($storeId, $min, $max, $charge);
+        AuditService::log('create', 'settings', 'gcash_charge_bracket', 0, null, ['min' => $min, 'max' => $max, 'charge' => $charge]);
+        Session::flash('success', 'Charge bracket added.');
+        $this->back('/settings/gcash-brackets');
+    }
+
+    public function deleteGcashBracket(Request $request): void
+    {
+        $storeId = (int) Auth::storeId();
+        $id = (int) $request->param('id');
+        GcashChargeBracketService::delete($storeId, $id);
+        AuditService::log('delete', 'settings', 'gcash_charge_bracket', $id);
+        Session::flash('success', 'Charge bracket removed.');
+        $this->back('/settings/gcash-brackets');
     }
 
     public function features(Request $request): void

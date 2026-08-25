@@ -131,6 +131,9 @@ $router->post('/settings/payment-methods', [SettingsController::class, 'updatePa
 $router->get('/settings/networks', [SettingsController::class, 'networks'], [$auth, $ownerOnly]);
 $router->post('/settings/networks', [SettingsController::class, 'storeNetwork'], [$auth, $ownerOnly, $csrf]);
 $router->post('/settings/networks/{id}/toggle', [SettingsController::class, 'toggleNetwork'], [$auth, $ownerOnly, $csrf]);
+$router->get('/settings/gcash-brackets', [SettingsController::class, 'gcashBrackets'], [$auth, $ownerOnly]);
+$router->post('/settings/gcash-brackets', [SettingsController::class, 'storeGcashBracket'], [$auth, $ownerOnly, $csrf]);
+$router->post('/settings/gcash-brackets/{id}/delete', [SettingsController::class, 'deleteGcashBracket'], [$auth, $ownerOnly, $csrf]);
 $router->post('/settings/security', [SettingsController::class, 'updateSecurity'], [$auth, $ownerOnly, $csrf]);
 $router->get('/settings/backup', [SettingsController::class, 'downloadBackup'], [$auth, $ownerOnly]);
 

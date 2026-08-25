@@ -42,6 +42,16 @@
     </div>
 
     <div class="card mb-16">
+        <div class="flex items-center justify-between" style="flex-wrap:wrap;gap:10px;">
+            <div>
+                <div class="card-title" style="margin:0;">GCash Charge Brackets</div>
+                <div class="text-muted" style="font-size:12.5px;">Set the amount ranges the GCash form uses to auto-suggest a service charge.</div>
+            </div>
+            <a href="<?= url('/settings/gcash-brackets') ?>" class="btn btn-outline">Manage Brackets <?= icon('chevron-right', 14) ?></a>
+        </div>
+    </div>
+
+    <div class="card mb-16">
         <div class="card-title">General Settings</div>
         <div class="card-subtitle">Store information, business preferences, receipt footer</div>
         <form method="post" action="<?= url('/settings/general') ?>">
