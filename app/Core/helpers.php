@@ -85,6 +85,16 @@ function current_user(): ?array
     return Auth::check() ? Auth::user() : null;
 }
 
+/** Best available display name for a supplier row: company name, else contact person, else a placeholder. */
+function supplier_display_name(array $s): string
+{
+    $contact = trim(($s['contact_first_name'] ?? '') . ' ' . ($s['contact_last_name'] ?? ''));
+    if (!empty($s['company_name']) && $contact) {
+        return $s['company_name'] . ' (' . $contact . ')';
+    }
+    return $s['company_name'] ?: ($contact ?: 'Unnamed Supplier');
+}
+
 function flash_get(string $key): ?string
 {
     return Session::flash($key);

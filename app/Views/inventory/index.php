@@ -1,10 +1,12 @@
 <?php
 /** @var array $products */
 /** @var array $categories */
+/** @var array $suppliers */
 /** @var array $stats */
 /** @var int $categoryCount */
 /** @var string $search */
 /** @var string $categoryId */
+/** @var string $supplierId */
 /** @var string $filter */
 /** @var int $page */
 /** @var int $totalPages */
@@ -70,6 +72,15 @@ function stock_badge(array $p): string
                 <?php endforeach; ?>
             </select>
         </div>
+        <div style="flex:1;min-width:160px;">
+            <label>Supplier</label>
+            <select name="supplier_id" class="form-control">
+                <option value="">All Suppliers</option>
+                <?php foreach ($suppliers as $s): ?>
+                    <option value="<?= $s['id'] ?>" <?= (string) $s['id'] === (string) $supplierId ? 'selected' : '' ?>><?= e(supplier_display_name($s)) ?></option>
+                <?php endforeach; ?>
+            </select>
+        </div>
         <button type="submit" class="btn btn-outline"><?= icon('search', 16) ?> Filter</button>
     </form>
 </div>
@@ -78,7 +89,7 @@ function stock_badge(array $p): string
     <div class="table-wrap">
         <table class="table">
             <thead>
-                <tr><th></th><th>Product</th><th>Category</th><th>Barcode</th><th>Cost</th><th>Selling Price</th><th>Stock</th><th>Status</th><?php if ($canManage): ?><th>Actions</th><?php endif; ?></tr>
+                <tr><th></th><th>Product</th><th>Category</th><th>Supplier</th><th>Barcode</th><th>Cost</th><th>Selling Price</th><th>Stock</th><th>Status</th><?php if ($canManage): ?><th>Actions</th><?php endif; ?></tr>
             </thead>
             <tbody>
             <?php foreach ($products as $p): ?>
@@ -92,6 +103,7 @@ function stock_badge(array $p): string
                     </td>
                     <td><strong><?= e($p['name']) ?></strong></td>
                     <td class="text-muted"><?= e($p['category_name'] ?? '—') ?></td>
+                    <td class="text-muted"><?= $p['supplier_company'] || $p['supplier_first_name'] || $p['supplier_last_name'] ? e(supplier_display_name(['company_name' => $p['supplier_company'], 'contact_first_name' => $p['supplier_first_name'], 'contact_last_name' => $p['supplier_last_name']])) : '—' ?></td>
                     <td class="text-muted"><?= e($p['barcode'] ?? '—') ?></td>
                     <td><?= money($p['cost_price']) ?></td>
                     <td><?= money($p['selling_price']) ?></td>
@@ -118,14 +130,14 @@ function stock_badge(array $p): string
                     <?php endif; ?>
                 </tr>
             <?php endforeach; ?>
-            <?php if (!$products): ?><tr><td colspan="9" class="text-muted">No products found.</td></tr><?php endif; ?>
+            <?php if (!$products): ?><tr><td colspan="10" class="text-muted">No products found.</td></tr><?php endif; ?>
             </tbody>
         </table>
     </div>
     <?php if ($totalPages > 1): ?>
     <div class="flex gap-8 mt-16">
         <?php for ($i = 1; $i <= $totalPages; $i++): ?>
-            <a class="btn btn-sm <?= $i === $page ? 'btn-primary' : 'btn-outline' ?>" href="<?= url('/inventory?page=' . $i . ($search ? '&q=' . urlencode($search) : '') . ($filter ? '&filter=' . $filter : '')) ?>"><?= $i ?></a>
+            <a class="btn btn-sm <?= $i === $page ? 'btn-primary' : 'btn-outline' ?>" href="<?= url('/inventory?page=' . $i . ($search ? '&q=' . urlencode($search) : '') . ($filter ? '&filter=' . $filter : '') . ($categoryId !== '' ? '&category_id=' . $categoryId : '') . ($supplierId !== '' ? '&supplier_id=' . $supplierId : '')) ?>"><?= $i ?></a>
         <?php endfor; ?>
     </div>
     <?php endif; ?>

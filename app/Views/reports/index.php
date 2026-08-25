@@ -91,11 +91,11 @@ $needsDateRange = !in_array($report, ['low_stock', 'inventory_value', 'utang_bal
 <?php elseif ($report === 'inventory_value'): ?>
     <div class="card-title">Inventory Value</div>
     <div class="table-wrap"><table class="table">
-        <thead><tr><th>Product</th><th>Stock</th><th>Cost Value</th><th>Retail Value</th></tr></thead>
+        <thead><tr><th>Product</th><th>Supplier</th><th>Stock</th><th>Cost Value</th><th>Retail Value</th></tr></thead>
         <tbody>
-        <?php foreach ($data['rows'] as $r): ?><tr><td><?= e($r['name']) ?></td><td><?= (int) $r['current_stock'] ?></td><td><?= money($r['cost_value']) ?></td><td><?= money($r['retail_value']) ?></td></tr><?php endforeach; ?>
+        <?php foreach ($data['rows'] as $r): ?><tr><td><?= e($r['name']) ?></td><td class="text-muted"><?= e($r['supplier']) ?></td><td><?= (int) $r['current_stock'] ?></td><td><?= money($r['cost_value']) ?></td><td><?= money($r['retail_value']) ?></td></tr><?php endforeach; ?>
         </tbody>
-        <tfoot><tr><td colspan="2" style="font-weight:700;">Total</td><td style="font-weight:700;"><?= money($data['total_cost_value']) ?></td><td style="font-weight:700;"><?= money($data['total_retail_value']) ?></td></tr></tfoot>
+        <tfoot><tr><td colspan="3" style="font-weight:700;">Total</td><td style="font-weight:700;"><?= money($data['total_cost_value']) ?></td><td style="font-weight:700;"><?= money($data['total_retail_value']) ?></td></tr></tfoot>
     </table></div>
 
 <?php elseif ($report === 'eload'): ?>

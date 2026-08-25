@@ -1,13 +1,5 @@
 <?php
 /** @var array $suppliers */
-function supplier_display_name(array $s): string
-{
-    $contact = trim(($s['contact_first_name'] ?? '') . ' ' . ($s['contact_last_name'] ?? ''));
-    if ($s['company_name'] && $contact) {
-        return $s['company_name'] . ' (' . $contact . ')';
-    }
-    return $s['company_name'] ?: $contact ?: 'Unnamed Supplier';
-}
 ?>
 <div class="flex items-center justify-between mb-16" style="flex-wrap:wrap;gap:10px;">
     <div>
@@ -20,18 +12,19 @@ function supplier_display_name(array $s): string
 <div class="card">
     <div class="table-wrap">
         <table class="table">
-            <thead><tr><th>Name</th><th>Contact</th><th>Address</th><th>Status</th><th>Actions</th></tr></thead>
+            <thead><tr><th>Name</th><th>Contact</th><th>Address</th><th>Products Supplied</th><th>Status</th><th>Actions</th></tr></thead>
             <tbody>
             <?php foreach ($suppliers as $s): ?>
                 <tr>
                     <td><strong><?= e(supplier_display_name($s)) ?></strong></td>
                     <td class="text-muted"><?= e($s['contact_number'] ?? '—') ?></td>
                     <td class="text-muted"><?= e($s['address'] ?? '—') ?></td>
+                    <td class="text-muted"><a href="<?= url('/inventory?supplier_id=' . $s['id']) ?>"><?= (int) $s['product_count'] ?></a></td>
                     <td><span class="badge <?= $s['status'] === 'active' ? 'badge-green' : 'badge-gray' ?>"><?= e(ucfirst($s['status'])) ?></span></td>
                     <td><button type="button" class="btn btn-sm btn-outline" data-modal-target="#edit-supplier-<?= $s['id'] ?>"><?= icon('edit', 14) ?></button></td>
                 </tr>
             <?php endforeach; ?>
-            <?php if (!$suppliers): ?><tr><td colspan="5" class="text-muted">No suppliers yet.</td></tr><?php endif; ?>
+            <?php if (!$suppliers): ?><tr><td colspan="6" class="text-muted">No suppliers yet.</td></tr><?php endif; ?>
             </tbody>
         </table>
     </div>

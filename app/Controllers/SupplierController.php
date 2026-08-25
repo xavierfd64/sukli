@@ -16,7 +16,11 @@ class SupplierController extends Controller
     public function index(Request $request): void
     {
         $storeId = Auth::storeId();
-        $suppliers = Database::all("SELECT * FROM suppliers WHERE store_id = ? ORDER BY company_name, contact_first_name", [$storeId]);
+        $suppliers = Database::all(
+            "SELECT s.*, (SELECT COUNT(*) FROM products p WHERE p.supplier_id = s.id) AS product_count
+             FROM suppliers s WHERE s.store_id = ? ORDER BY s.company_name, s.contact_first_name",
+            [$storeId]
+        );
         $this->view('suppliers/index', ['pageTitle' => 'Suppliers', 'suppliers' => $suppliers]);
     }
 

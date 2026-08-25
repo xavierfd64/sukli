@@ -132,10 +132,30 @@ CREATE TABLE IF NOT EXISTS product_categories (
     CONSTRAINT fk_categories_store FOREIGN KEY (store_id) REFERENCES stores(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- At least one of company_name / contact_first_name / contact_last_name must
+-- be present -- enforced in SupplierController, not by a DB constraint (kept
+-- portable across MySQL versions that may not support CHECK constraints).
+-- Defined here (ahead of products) so products.supplier_id can reference it.
+CREATE TABLE IF NOT EXISTS suppliers (
+    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    store_id INT UNSIGNED NOT NULL,
+    company_name VARCHAR(150) NULL,
+    contact_first_name VARCHAR(100) NULL,
+    contact_last_name VARCHAR(100) NULL,
+    contact_number VARCHAR(30) NULL,
+    address VARCHAR(255) NULL,
+    notes VARCHAR(255) NULL,
+    status ENUM('active','inactive') NOT NULL DEFAULT 'active',
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    CONSTRAINT fk_suppliers_store FOREIGN KEY (store_id) REFERENCES stores(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE IF NOT EXISTS products (
     id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     store_id INT UNSIGNED NOT NULL,
     category_id INT UNSIGNED NULL,
+    supplier_id INT UNSIGNED NULL,
     name VARCHAR(150) NOT NULL,
     barcode VARCHAR(64) NULL,
     image_path VARCHAR(255) NULL,
@@ -150,8 +170,10 @@ CREATE TABLE IF NOT EXISTS products (
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     KEY idx_products_store_status (store_id, status),
     KEY idx_products_barcode (store_id, barcode),
+    KEY idx_products_supplier (supplier_id),
     CONSTRAINT fk_products_store FOREIGN KEY (store_id) REFERENCES stores(id) ON DELETE CASCADE,
-    CONSTRAINT fk_products_category FOREIGN KEY (category_id) REFERENCES product_categories(id) ON DELETE SET NULL
+    CONSTRAINT fk_products_category FOREIGN KEY (category_id) REFERENCES product_categories(id) ON DELETE SET NULL,
+    CONSTRAINT fk_products_supplier FOREIGN KEY (supplier_id) REFERENCES suppliers(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS inventory_transactions (
@@ -367,24 +389,6 @@ CREATE TABLE IF NOT EXISTS gcash_records (
 -- ---------------------------------------------------------------------------
 -- Suppliers
 -- ---------------------------------------------------------------------------
-
--- At least one of company_name / contact_first_name / contact_last_name must
--- be present -- enforced in SupplierController, not by a DB constraint (kept
--- portable across MySQL versions that may not support CHECK constraints).
-CREATE TABLE IF NOT EXISTS suppliers (
-    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-    store_id INT UNSIGNED NOT NULL,
-    company_name VARCHAR(150) NULL,
-    contact_first_name VARCHAR(100) NULL,
-    contact_last_name VARCHAR(100) NULL,
-    contact_number VARCHAR(30) NULL,
-    address VARCHAR(255) NULL,
-    notes VARCHAR(255) NULL,
-    status ENUM('active','inactive') NOT NULL DEFAULT 'active',
-    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    CONSTRAINT fk_suppliers_store FOREIGN KEY (store_id) REFERENCES stores(id) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ---------------------------------------------------------------------------
 -- E-Load networks / GCash charge brackets (admin-manageable lists)

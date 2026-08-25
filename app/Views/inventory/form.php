@@ -1,6 +1,7 @@
 <?php
 /** @var array|null $product */
 /** @var array $categories */
+/** @var array $suppliers */
 $isEdit = $product !== null;
 ?>
 <div class="card" style="max-width:720px;">
@@ -45,6 +46,16 @@ $isEdit = $product !== null;
                 <label>Unit</label>
                 <input class="form-control" type="text" name="unit" value="<?= e($product['unit'] ?? 'pc') ?>" placeholder="pc, bottle, pack, sachet...">
             </div>
+        </div>
+        <div class="form-group">
+            <label>Supplier</label>
+            <select name="supplier_id" class="form-control">
+                <option value="">No supplier</option>
+                <?php foreach ($suppliers as $s): ?>
+                    <option value="<?= $s['id'] ?>" <?= (string) $s['id'] === (string) ($product['supplier_id'] ?? '') ? 'selected' : '' ?>><?= e(supplier_display_name($s)) ?></option>
+                <?php endforeach; ?>
+            </select>
+            <?php if (!$suppliers): ?><div class="form-hint">No suppliers yet — add one under Suppliers first.</div><?php endif; ?>
         </div>
         <div class="form-row">
             <div class="form-group">

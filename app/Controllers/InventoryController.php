@@ -22,6 +22,7 @@ class InventoryController extends Controller
 
         $search = $request->trimmed('q');
         $categoryId = $request->input('category_id', '');
+        $supplierId = $request->input('supplier_id', '');
         $status = $request->input('status', '');
         $filter = $request->input('filter', '');
         $page = max(1, (int) $request->input('page', 1));
@@ -39,6 +40,10 @@ class InventoryController extends Controller
             $where[] = 'p.category_id = ?';
             $params[] = (int) $categoryId;
         }
+        if ($supplierId !== '') {
+            $where[] = 'p.supplier_id = ?';
+            $params[] = (int) $supplierId;
+        }
         if ($filter === 'low_stock') {
             $where[] = 'p.status = "active" AND p.current_stock > 0 AND p.current_stock <= p.min_stock';
         } elseif ($filter === 'out_of_stock') {
@@ -53,18 +58,20 @@ class InventoryController extends Controller
         }
 
         $whereSql = implode(' AND ', $where);
-        $fromSql = 'products p LEFT JOIN product_categories c ON c.id = p.category_id';
+        $fromSql = 'products p LEFT JOIN product_categories c ON c.id = p.category_id LEFT JOIN suppliers s ON s.id = p.supplier_id';
 
         $total = (int) Database::one("SELECT COUNT(*) AS cnt FROM {$fromSql} WHERE {$whereSql}", $params)['cnt'];
         $offset = ($page - 1) * $perPage;
 
         $products = Database::all(
-            "SELECT p.*, c.name AS category_name FROM {$fromSql}
+            "SELECT p.*, c.name AS category_name, s.company_name AS supplier_company, s.contact_first_name AS supplier_first_name, s.contact_last_name AS supplier_last_name
+             FROM {$fromSql}
              WHERE {$whereSql} ORDER BY p.name ASC LIMIT {$perPage} OFFSET {$offset}",
             $params
         );
 
         $categories = Database::all("SELECT id, name FROM product_categories WHERE store_id = ? ORDER BY name", [$storeId]);
+        $suppliers = Database::all("SELECT id, company_name, contact_first_name, contact_last_name FROM suppliers WHERE store_id = ? AND status = 'active' ORDER BY company_name, contact_first_name", [$storeId]);
 
         $stats = Database::one(
             "SELECT COUNT(*) AS total_products,
@@ -79,10 +86,12 @@ class InventoryController extends Controller
             'pageTitle' => 'Inventory',
             'products' => $products,
             'categories' => $categories,
+            'suppliers' => $suppliers,
             'stats' => $stats,
             'categoryCount' => count($categories),
             'search' => $search,
             'categoryId' => $categoryId,
+            'supplierId' => $supplierId,
             'filter' => $filter,
             'page' => $page,
             'totalPages' => (int) ceil($total / $perPage),
@@ -92,11 +101,14 @@ class InventoryController extends Controller
 
     public function create(Request $request): void
     {
-        $categories = Database::all("SELECT id, name FROM product_categories WHERE store_id = ? ORDER BY name", [Auth::storeId()]);
+        $storeId = Auth::storeId();
+        $categories = Database::all("SELECT id, name FROM product_categories WHERE store_id = ? ORDER BY name", [$storeId]);
+        $suppliers = Database::all("SELECT id, company_name, contact_first_name, contact_last_name FROM suppliers WHERE store_id = ? AND status = 'active' ORDER BY company_name, contact_first_name", [$storeId]);
         $this->view('inventory/form', [
             'pageTitle' => 'Add Product',
             'product' => null,
             'categories' => $categories,
+            'suppliers' => $suppliers,
         ]);
     }
 
@@ -119,9 +131,9 @@ class InventoryController extends Controller
         Database::beginTransaction();
         try {
             Database::execute(
-                "INSERT INTO products (store_id, category_id, name, barcode, image_path, unit, cost_price, selling_price, current_stock, min_stock, expiry_date, status)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, 'active')",
-                [$storeId, $data['category_id'], $data['name'], $data['barcode'], $imagePath, $data['unit'],
+                "INSERT INTO products (store_id, category_id, supplier_id, name, barcode, image_path, unit, cost_price, selling_price, current_stock, min_stock, expiry_date, status)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, 'active')",
+                [$storeId, $data['category_id'], $data['supplier_id'], $data['name'], $data['barcode'], $imagePath, $data['unit'],
                  $data['cost_price'], $data['selling_price'], $data['min_stock'], $data['expiry_date']]
             );
             $productId = (int) Database::lastInsertId();
@@ -151,10 +163,12 @@ class InventoryController extends Controller
             $this->redirect('/inventory');
         }
         $categories = Database::all("SELECT id, name FROM product_categories WHERE store_id = ? ORDER BY name", [Auth::storeId()]);
+        $suppliers = Database::all("SELECT id, company_name, contact_first_name, contact_last_name FROM suppliers WHERE store_id = ? AND status = 'active' ORDER BY company_name, contact_first_name", [Auth::storeId()]);
         $this->view('inventory/form', [
             'pageTitle' => 'Edit Product',
             'product' => $product,
             'categories' => $categories,
+            'suppliers' => $suppliers,
         ]);
     }
 
@@ -186,9 +200,9 @@ class InventoryController extends Controller
         }
 
         Database::execute(
-            "UPDATE products SET category_id=?, name=?, barcode=?, image_path=?, unit=?, cost_price=?, selling_price=?, min_stock=?, expiry_date=?, updated_at=NOW()
+            "UPDATE products SET category_id=?, supplier_id=?, name=?, barcode=?, image_path=?, unit=?, cost_price=?, selling_price=?, min_stock=?, expiry_date=?, updated_at=NOW()
              WHERE id = ? AND store_id = ?",
-            [$data['category_id'], $data['name'], $data['barcode'], $imagePath, $data['unit'], $data['cost_price'],
+            [$data['category_id'], $data['supplier_id'], $data['name'], $data['barcode'], $imagePath, $data['unit'], $data['cost_price'],
              $data['selling_price'], $data['min_stock'], $data['expiry_date'], $id, $storeId]
         );
 
@@ -433,6 +447,7 @@ class InventoryController extends Controller
     {
         return [
             'category_id' => $request->input('category_id') !== '' ? (int) $request->input('category_id') : null,
+            'supplier_id' => $request->input('supplier_id') !== '' ? (int) $request->input('supplier_id') : null,
             'name' => $request->trimmed('name'),
             'barcode' => $request->trimmed('barcode') ?: null,
             'unit' => $request->trimmed('unit') ?: 'pc',

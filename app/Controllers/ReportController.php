@@ -72,7 +72,7 @@ class ReportController extends Controller
             'income' => ['category' => 'Category', 'cnt' => 'Count', 'total' => 'Total'],
             'expense' => ['category' => 'Category', 'cnt' => 'Count', 'total' => 'Total'],
             'low_stock' => ['name' => 'Product', 'current_stock' => 'Current Stock', 'min_stock' => 'Min Stock', 'unit' => 'Unit'],
-            'inventory_value' => ['name' => 'Product', 'current_stock' => 'Stock', 'cost_value' => 'Cost Value', 'retail_value' => 'Retail Value'],
+            'inventory_value' => ['name' => 'Product', 'supplier' => 'Supplier', 'current_stock' => 'Stock', 'cost_value' => 'Cost Value', 'retail_value' => 'Retail Value'],
             'eload' => ['transacted_at' => 'Date', 'customer_name' => 'Customer', 'network' => 'Network', 'load_amount' => 'Load', 'amount_received' => 'Received', 'profit' => 'Profit'],
             'gcash' => ['transacted_at' => 'Date', 'type' => 'Type', 'amount' => 'Amount', 'service_charge' => 'Service Charge', 'customer_reference' => 'Reference'],
             'utang_balances' => ['name' => 'Customer', 'outstanding_balance' => 'Outstanding Balance'],
@@ -182,10 +182,18 @@ class ReportController extends Controller
     private function inventoryValueReport(int $storeId): array
     {
         $rows = Database::all(
-            "SELECT name, current_stock, cost_price, selling_price, (current_stock * cost_price) AS cost_value, (current_stock * selling_price) AS retail_value
-             FROM products WHERE store_id = ? AND status='active' ORDER BY cost_value DESC",
+            "SELECT p.name, p.current_stock, p.cost_price, p.selling_price,
+                    (p.current_stock * p.cost_price) AS cost_value, (p.current_stock * p.selling_price) AS retail_value,
+                    s.company_name AS supplier_company, s.contact_first_name AS supplier_first_name, s.contact_last_name AS supplier_last_name
+             FROM products p LEFT JOIN suppliers s ON s.id = p.supplier_id
+             WHERE p.store_id = ? AND p.status='active' ORDER BY cost_value DESC",
             [$storeId]
         );
+        foreach ($rows as &$row) {
+            $row['supplier'] = ($row['supplier_company'] || $row['supplier_first_name'] || $row['supplier_last_name'])
+                ? supplier_display_name(['company_name' => $row['supplier_company'], 'contact_first_name' => $row['supplier_first_name'], 'contact_last_name' => $row['supplier_last_name']])
+                : '—';
+        }
         return [
             'rows' => $rows,
             'total_cost_value' => array_sum(array_column($rows, 'cost_value')),
