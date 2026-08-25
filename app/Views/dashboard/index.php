@@ -14,11 +14,17 @@
 /** @var array $recentTransactions */
 /** @var array $topProducts */
 /** @var array $features */
+/** @var string $period */
+/** @var string $from */
+/** @var string $to */
+/** @var string $periodLabel */
 
-function delta_badge(float $delta): string
-{
-    $sign = $delta >= 0 ? '+' : '';
-    return $sign . number_format($delta, 1) . '% vs yesterday';
+if (!function_exists('delta_badge')) {
+    function delta_badge(float $delta): string
+    {
+        $sign = $delta >= 0 ? '+' : '';
+        return $sign . number_format($delta, 1) . '% vs previous period';
+    }
 }
 
 $paymentColors = ['cash' => '#22c55e', 'gcash' => '#3b82f6', 'utang' => '#f97316'];
@@ -33,28 +39,45 @@ foreach ($paymentSummary as $row) {
 }
 $gradientCss = $gradientStops ? implode(', ', $gradientStops) : '#e5e7eb 0% 100%';
 ?>
+<div class="card mb-16">
+    <form method="get" action="<?= url('/dashboard') ?>" class="flex items-center gap-12" style="flex-wrap:wrap;">
+        <div class="section-tabs" style="margin:0;border:none;">
+            <?php foreach (['today' => 'Today', 'week' => 'Weekly', 'month' => 'Monthly', 'year' => 'Annually'] as $key => $label): ?>
+                <a href="<?= url('/dashboard?period=' . $key) ?>" class="<?= $period === $key ? 'is-active' : '' ?>"><?= e($label) ?></a>
+            <?php endforeach; ?>
+        </div>
+        <div class="flex items-center gap-8" style="margin-left:auto;flex-wrap:wrap;">
+            <input type="hidden" name="period" value="custom">
+            <input class="form-control" type="date" name="from" value="<?= e($from) ?>" style="width:auto;">
+            <span class="text-muted">to</span>
+            <input class="form-control" type="date" name="to" value="<?= e($to) ?>" style="width:auto;">
+            <button type="submit" class="btn btn-outline btn-sm">Custom Range</button>
+        </div>
+    </form>
+</div>
+
 <div class="grid grid-4 mb-16">
     <div class="kpi-card kpi-green">
         <div class="kpi-icon"><?= icon('pos', 30) ?></div>
-        <div class="kpi-label">Total Sales (Today)</div>
+        <div class="kpi-label">Total Sales (<?= e($periodLabel) ?>)</div>
         <div class="kpi-value"><?= money($salesToday) ?></div>
         <div class="kpi-delta"><?= delta_badge($salesDelta) ?></div>
     </div>
     <div class="kpi-card kpi-blue">
         <div class="kpi-icon"><?= icon('wallet', 30) ?></div>
-        <div class="kpi-label">Total Income (Today)</div>
+        <div class="kpi-label">Total Income (<?= e($periodLabel) ?>)</div>
         <div class="kpi-value"><?= money($incomeToday) ?></div>
         <div class="kpi-delta"><?= delta_badge($incomeDelta) ?></div>
     </div>
     <div class="kpi-card kpi-orange">
         <div class="kpi-icon"><?= icon('expense', 30) ?></div>
-        <div class="kpi-label">Total Expenses (Today)</div>
+        <div class="kpi-label">Total Expenses (<?= e($periodLabel) ?>)</div>
         <div class="kpi-value"><?= money($expenseToday) ?></div>
         <div class="kpi-delta"><?= delta_badge($expenseDelta) ?></div>
     </div>
     <div class="kpi-card kpi-purple">
         <div class="kpi-icon"><?= icon('reports', 30) ?></div>
-        <div class="kpi-label">Net Income (Today)</div>
+        <div class="kpi-label">Net Income (<?= e($periodLabel) ?>)</div>
         <div class="kpi-value"><?= money($netToday) ?></div>
         <div class="kpi-delta"><?= delta_badge($netDelta) ?></div>
     </div>
@@ -63,7 +86,7 @@ $gradientCss = $gradientStops ? implode(', ', $gradientStops) : '#e5e7eb 0% 100%
 <div class="grid grid-3 mb-16">
     <div class="card">
         <div class="card-title">Payment Summary</div>
-        <div class="card-subtitle">Today's completed sales by method</div>
+        <div class="card-subtitle">Completed sales by method for the selected period</div>
         <div class="flex items-center gap-16">
             <div style="width:110px;height:110px;border-radius:50%;background:conic-gradient(<?= $gradientCss ?>);flex-shrink:0;"></div>
             <div style="flex:1;">
@@ -76,7 +99,7 @@ $gradientCss = $gradientStops ? implode(', ', $gradientStops) : '#e5e7eb 0% 100%
                         <strong><?= money($row['total']) ?></strong>
                     </div>
                 <?php endforeach; ?>
-                <?php if (!$paymentSummary): ?><p class="text-muted">No sales yet today.</p><?php endif; ?>
+                <?php if (!$paymentSummary): ?><p class="text-muted">No sales yet for this period.</p><?php endif; ?>
             </div>
         </div>
     </div>
@@ -136,7 +159,7 @@ $gradientCss = $gradientStops ? implode(', ', $gradientStops) : '#e5e7eb 0% 100%
 
     <div class="card">
         <div class="card-title">Top Selling Products</div>
-        <div class="card-subtitle">All-time, by quantity sold</div>
+        <div class="card-subtitle">For the selected period, by quantity sold</div>
         <?php $i = 1; foreach ($topProducts as $p): ?>
             <div class="flex items-center justify-between" style="padding:8px 0;border-bottom:1px solid var(--border);">
                 <span><?= $i++ ?>. <?= e($p['product_name']) ?></span>
