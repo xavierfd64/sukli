@@ -172,13 +172,15 @@ class DashboardController extends Controller
              UNION ALL
              (SELECT 'E-Load', CONCAT(COALESCE(network,'Load'), ' - ', COALESCE(customer_name,'Walk-in')), load_amount, created_at FROM eload_records WHERE store_id = ? AND DATE(created_at) BETWEEN ? AND ?)
              UNION ALL
+             (SELECT 'E-Load', CONCAT(COALESCE(network,'Load'), ' - ', COALESCE(customer_name,'Walk-in')), selling_price, created_at FROM eload_transactions WHERE store_id = ? AND status='completed' AND DATE(created_at) BETWEEN ? AND ?)
+             UNION ALL
              (SELECT IF(type='cash_in','GCash In','GCash Out'), COALESCE(customer_reference,'GCash'), amount, created_at FROM gcash_records WHERE store_id = ? AND DATE(created_at) BETWEEN ? AND ?)
              UNION ALL
              (SELECT 'Payment', CONCAT('Utang Payment'), amount, created_at FROM utang_payments WHERE store_id = ? AND DATE(created_at) BETWEEN ? AND ?)
              ORDER BY created_at DESC LIMIT 8",
             [
                 $storeId, $from, $to, $storeId, $from, $to, $storeId, $from, $to,
-                $storeId, $from, $to, $storeId, $from, $to, $storeId, $from, $to,
+                $storeId, $from, $to, $storeId, $from, $to, $storeId, $from, $to, $storeId, $from, $to,
             ]
         );
         return $rows;

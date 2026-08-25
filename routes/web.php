@@ -93,9 +93,9 @@ $router->post('/expenses', [ExpenseController::class, 'store'], [$auth, $perm('e
 $router->post('/expenses/{id}', [ExpenseController::class, 'update'], [$auth, $perm('expenses', 'edit'), $csrf]);
 $router->post('/expenses/{id}/delete', [ExpenseController::class, 'destroy'], [$auth, $perm('expenses', 'delete'), $csrf]);
 
-// -- E-Load / GCash (feature-flagged, recording only) ------------------------
+// -- E-Load / GCash (feature-flagged) -----------------------------------------
 $router->get('/eload', [EloadController::class, 'index'], [$auth, $eloadOn, $perm('eload', 'view')]);
-$router->post('/eload', [EloadController::class, 'store'], [$auth, $eloadOn, $perm('eload', 'add'), $csrf]);
+$router->post('/eload/checkout', [EloadController::class, 'checkout'], [$auth, $eloadOn, $perm('eload', 'add'), $csrf]);
 
 $router->get('/gcash', [GcashController::class, 'index'], [$auth, $gcashOn, $perm('gcash', 'view')]);
 $router->post('/gcash', [GcashController::class, 'store'], [$auth, $gcashOn, $perm('gcash', 'add'), $csrf]);

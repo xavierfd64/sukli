@@ -210,17 +210,18 @@ class SettingsController extends Controller
         $storeId = (int) Auth::storeId();
         $network = $request->trimmed('network');
         $name = $request->trimmed('name');
+        $loadValue = (float) $request->input('load_value', 0);
         $cost = (float) $request->input('cost', 0);
         $additionalCharge = (float) $request->input('additional_charge', 0);
         $sellingPrice = (float) $request->input('selling_price', 0);
 
-        if (!$network || !$name || $cost < 0 || $additionalCharge < 0 || $sellingPrice < 0) {
+        if (!$network || !$name || $loadValue < 0 || $cost < 0 || $additionalCharge < 0 || $sellingPrice < 0) {
             Session::flash('error', 'Enter a network, product name, and valid non-negative amounts.');
             $this->back('/settings/eload-products');
         }
 
-        EloadProductService::create($storeId, $network, $name, $cost, $additionalCharge, $sellingPrice);
-        AuditService::log('create', 'settings', 'eload_product', 0, null, ['network' => $network, 'name' => $name, 'cost' => $cost, 'selling_price' => $sellingPrice]);
+        EloadProductService::create($storeId, $network, $name, $loadValue, $cost, $additionalCharge, $sellingPrice);
+        AuditService::log('create', 'settings', 'eload_product', 0, null, ['network' => $network, 'name' => $name, 'load_value' => $loadValue, 'cost' => $cost, 'selling_price' => $sellingPrice]);
         Session::flash('success', 'E-Load product added.');
         $this->back('/settings/eload-products');
     }
@@ -231,17 +232,18 @@ class SettingsController extends Controller
         $id = (int) $request->param('id');
         $network = $request->trimmed('network');
         $name = $request->trimmed('name');
+        $loadValue = (float) $request->input('load_value', 0);
         $cost = (float) $request->input('cost', 0);
         $additionalCharge = (float) $request->input('additional_charge', 0);
         $sellingPrice = (float) $request->input('selling_price', 0);
 
-        if (!$network || !$name || $cost < 0 || $additionalCharge < 0 || $sellingPrice < 0) {
+        if (!$network || !$name || $loadValue < 0 || $cost < 0 || $additionalCharge < 0 || $sellingPrice < 0) {
             Session::flash('error', 'Enter a network, product name, and valid non-negative amounts.');
             $this->back('/settings/eload-products');
         }
 
-        EloadProductService::update($storeId, $id, $network, $name, $cost, $additionalCharge, $sellingPrice);
-        AuditService::log('update', 'settings', 'eload_product', $id, null, ['network' => $network, 'name' => $name, 'cost' => $cost, 'selling_price' => $sellingPrice]);
+        EloadProductService::update($storeId, $id, $network, $name, $loadValue, $cost, $additionalCharge, $sellingPrice);
+        AuditService::log('update', 'settings', 'eload_product', $id, null, ['network' => $network, 'name' => $name, 'load_value' => $loadValue, 'cost' => $cost, 'selling_price' => $sellingPrice]);
         Session::flash('success', 'E-Load product updated.');
         $this->back('/settings/eload-products');
     }
@@ -411,6 +413,9 @@ class SettingsController extends Controller
             'income_records' => 'SELECT * FROM income_records WHERE store_id = ?',
             'expense_records' => 'SELECT * FROM expense_records WHERE store_id = ?',
             'eload_records' => 'SELECT * FROM eload_records WHERE store_id = ?',
+            'eload_products' => 'SELECT * FROM eload_products WHERE store_id = ?',
+            'eload_transactions' => 'SELECT * FROM eload_transactions WHERE store_id = ?',
+            'eload_payments' => 'SELECT ep.* FROM eload_payments ep JOIN eload_transactions et ON et.id = ep.eload_transaction_id WHERE et.store_id = ?',
             'gcash_records' => 'SELECT * FROM gcash_records WHERE store_id = ?',
             'suppliers' => 'SELECT * FROM suppliers WHERE store_id = ?',
             'feature_settings' => 'SELECT * FROM feature_settings WHERE store_id = ?',

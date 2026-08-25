@@ -37,21 +37,21 @@ class EloadProductService
         return Database::one("SELECT * FROM eload_products WHERE id = ? AND store_id = ?", [$id, $storeId]);
     }
 
-    public static function create(int $storeId, string $network, string $name, float $cost, float $additionalCharge, float $sellingPrice): void
+    public static function create(int $storeId, string $network, string $name, float $loadValue, float $cost, float $additionalCharge, float $sellingPrice): void
     {
         Database::execute(
-            "INSERT INTO eload_products (store_id, network, name, cost, additional_charge, selling_price, is_active)
-             VALUES (?, ?, ?, ?, ?, ?, 1)",
-            [$storeId, $network, $name, $cost, $additionalCharge, $sellingPrice]
+            "INSERT INTO eload_products (store_id, network, name, load_value, cost, additional_charge, selling_price, is_active)
+             VALUES (?, ?, ?, ?, ?, ?, ?, 1)",
+            [$storeId, $network, $name, $loadValue, $cost, $additionalCharge, $sellingPrice]
         );
     }
 
-    public static function update(int $storeId, int $id, string $network, string $name, float $cost, float $additionalCharge, float $sellingPrice): void
+    public static function update(int $storeId, int $id, string $network, string $name, float $loadValue, float $cost, float $additionalCharge, float $sellingPrice): void
     {
         Database::execute(
-            "UPDATE eload_products SET network = ?, name = ?, cost = ?, additional_charge = ?, selling_price = ?
+            "UPDATE eload_products SET network = ?, name = ?, load_value = ?, cost = ?, additional_charge = ?, selling_price = ?
              WHERE id = ? AND store_id = ?",
-            [$network, $name, $cost, $additionalCharge, $sellingPrice, $id, $storeId]
+            [$network, $name, $loadValue, $cost, $additionalCharge, $sellingPrice, $id, $storeId]
         );
     }
 

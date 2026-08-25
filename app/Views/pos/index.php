@@ -29,6 +29,11 @@
                 <button type="button" class="pos-product" data-category="<?= e($p['category_name'] ?: 'Others') ?>" data-name="<?= e(strtolower($p['name'])) ?>"
                         data-id="<?= $p['id'] ?>" data-price="<?= $p['selling_price'] ?>" data-pname="<?= e($p['name']) ?>" data-stock="<?= (int) $p['current_stock'] ?>"
                         data-barcode="<?= e($p['barcode'] ?? '') ?>">
+                    <?php if (\Sukli\Services\UploadService::exists($p['image_path'] ?? null)): ?>
+                        <img src="<?= e(\Sukli\Services\UploadService::url($p['image_path'])) ?>" alt="" class="product-thumb pos-product-thumb">
+                    <?php else: ?>
+                        <div class="product-thumb product-thumb-placeholder pos-product-thumb">NO<br>IMAGE</div>
+                    <?php endif; ?>
                     <div class="pos-product-name"><?= e($p['name']) ?></div>
                     <div class="pos-product-price"><?= money($p['selling_price']) ?></div>
                     <div class="pos-product-stock">Stock: <?= (int) $p['current_stock'] ?></div>

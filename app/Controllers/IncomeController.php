@@ -69,10 +69,20 @@ class IncomeController extends Controller
             ];
         }
 
+        // Sums both the legacy manual-entry table (eload_records, kept for
+        // historical data — see EloadController) and the current
+        // product-based eload_transactions, so nothing already recorded is
+        // lost and every new E-Load sale counts here exactly once. Only the
+        // margin (earnings = selling_price - store_cost) counts as income,
+        // regardless of payment method used (including Utang) — the same
+        // way this line already worked before product-based E-Load existed.
         $eloadProfit = Database::one(
-            "SELECT COUNT(*) AS cnt, COALESCE(SUM(profit),0) AS total FROM eload_records
-             WHERE store_id = ? AND DATE(transacted_at) BETWEEN ? AND ?",
-            [$storeId, $from, $to]
+            "SELECT
+                (SELECT COUNT(*) FROM eload_records WHERE store_id = ? AND DATE(transacted_at) BETWEEN ? AND ?)
+                + (SELECT COUNT(*) FROM eload_transactions WHERE store_id = ? AND status = 'completed' AND DATE(created_at) BETWEEN ? AND ?) AS cnt,
+                (SELECT COALESCE(SUM(profit),0) FROM eload_records WHERE store_id = ? AND DATE(transacted_at) BETWEEN ? AND ?)
+                + (SELECT COALESCE(SUM(earnings),0) FROM eload_transactions WHERE store_id = ? AND status = 'completed' AND DATE(created_at) BETWEEN ? AND ?) AS total",
+            [$storeId, $from, $to, $storeId, $from, $to, $storeId, $from, $to, $storeId, $from, $to]
         );
         $sources[] = ['label' => 'E-Load Earnings', 'note' => 'Profit margin earned on E-Load transactions', 'count' => (int) $eloadProfit['cnt'], 'total' => (float) $eloadProfit['total']];
 

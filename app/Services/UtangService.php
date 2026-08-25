@@ -15,7 +15,15 @@ use Sukli\Core\Database;
  */
 class UtangService
 {
-    public static function recordSaleCredit(int $storeId, int $customerId, int $saleId, float $amount): void
+    /**
+     * Extends Utang credit for any kind of transaction, not only a POS sale
+     * — $saleId and $eloadTransactionId are each independently nullable so
+     * an E-Load sale on Utang (which has no `sales` row of its own; see
+     * eload_transactions) can link here through $eloadTransactionId while
+     * leaving $saleId null, the same way a POS sale on Utang links through
+     * $saleId while leaving $eloadTransactionId null.
+     */
+    public static function recordSaleCredit(int $storeId, int $customerId, ?int $saleId, float $amount, ?int $eloadTransactionId = null): void
     {
         Database::execute(
             "INSERT INTO customer_credit_accounts (store_id, customer_id, outstanding_balance)
@@ -27,9 +35,9 @@ class UtangService
         $balance = self::balance($customerId);
 
         Database::execute(
-            "INSERT INTO utang_transactions (store_id, customer_id, sale_id, amount, balance_after, status, created_by, created_at)
-             VALUES (?, ?, ?, ?, ?, 'outstanding', ?, NOW())",
-            [$storeId, $customerId, $saleId, $amount, $balance, Auth::id()]
+            "INSERT INTO utang_transactions (store_id, customer_id, sale_id, eload_transaction_id, amount, balance_after, status, created_by, created_at)
+             VALUES (?, ?, ?, ?, ?, ?, 'outstanding', ?, NOW())",
+            [$storeId, $customerId, $saleId, $eloadTransactionId, $amount, $balance, Auth::id()]
         );
     }
 

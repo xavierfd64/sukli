@@ -284,10 +284,17 @@ CREATE TABLE IF NOT EXISTS utang_transactions (
     due_date DATE NULL,
     status ENUM('outstanding','partially_paid','paid') NOT NULL DEFAULT 'outstanding',
     note VARCHAR(255) NULL,
+    -- Links this Utang credit to the E-Load transaction that created it, when
+    -- applicable (an E-Load sale on Utang, same as sale_id does for a POS
+    -- sale on Utang). No inline FK: eload_transactions is defined later in
+    -- this file (it references this table's sibling tables), so this stays
+    -- a soft reference the same way network name columns elsewhere do.
+    eload_transaction_id BIGINT UNSIGNED NULL,
     created_by INT UNSIGNED NULL,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     KEY idx_utang_txn_customer (customer_id, created_at),
     KEY idx_utang_txn_store (store_id, created_at),
+    KEY idx_utang_txn_eload (eload_transaction_id),
     CONSTRAINT fk_utang_txn_store FOREIGN KEY (store_id) REFERENCES stores(id) ON DELETE CASCADE,
     CONSTRAINT fk_utang_txn_customer FOREIGN KEY (customer_id) REFERENCES customers(id) ON DELETE CASCADE,
     CONSTRAINT fk_utang_txn_sale FOREIGN KEY (sale_id) REFERENCES sales(id) ON DELETE SET NULL,
@@ -414,6 +421,10 @@ CREATE TABLE IF NOT EXISTS eload_products (
     store_id INT UNSIGNED NOT NULL,
     network VARCHAR(50) NOT NULL,
     name VARCHAR(100) NOT NULL,
+    -- load_value: the promo/load amount the customer actually receives
+    -- (e.g. ₱99) — distinct from cost (what the store pays the telco,
+    -- e.g. ₱95) and selling_price (what the customer pays, e.g. ₱105).
+    load_value DECIMAL(10,2) NOT NULL DEFAULT 0.00,
     cost DECIMAL(10,2) NOT NULL DEFAULT 0.00,
     additional_charge DECIMAL(10,2) NOT NULL DEFAULT 0.00,
     selling_price DECIMAL(10,2) NOT NULL DEFAULT 0.00,
@@ -422,6 +433,59 @@ CREATE TABLE IF NOT EXISTS eload_products (
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     KEY idx_eload_products_store (store_id, network),
     CONSTRAINT fk_eload_products_store FOREIGN KEY (store_id) REFERENCES stores(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- A completed E-Load sale, product-based (cashier picks a saved
+-- eload_product; every financial field here is a snapshot copied from it
+-- at the moment of sale, so later edits to the product catalog never
+-- change historical records). Deliberately NOT a row in `sales` — E-Load
+-- margin (not gross revenue) is what counts as income (see
+-- IncomeController), so keeping it in its own table means every existing
+-- sales/payments-based query (Dashboard, Reports, Settings summary)
+-- keeps meaning exactly what it meant before this table existed, with
+-- zero risk of silently pulling E-Load transactions into POS sales
+-- totals. Payment handling (method validation, cash change, split-sum,
+-- Utang) is still shared code — see Sukli\Services\PaymentProcessor —
+-- just not shared *rows*.
+CREATE TABLE IF NOT EXISTS eload_transactions (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    store_id INT UNSIGNED NOT NULL,
+    customer_id INT UNSIGNED NULL,
+    customer_name VARCHAR(150) NULL,
+    contact_number VARCHAR(30) NULL,
+    eload_product_id INT UNSIGNED NULL,
+    network VARCHAR(50) NOT NULL,
+    product_name VARCHAR(100) NOT NULL,
+    load_value DECIMAL(10,2) NOT NULL,
+    store_cost DECIMAL(10,2) NOT NULL,
+    additional_charge DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+    selling_price DECIMAL(10,2) NOT NULL,
+    earnings DECIMAL(10,2) NOT NULL,
+    payment_method ENUM('cash','gcash','utang','ewallet','bank_transfer','other','split') NOT NULL,
+    amount_tendered DECIMAL(10,2) NULL,
+    change_amount DECIMAL(10,2) NULL,
+    status ENUM('completed','voided') NOT NULL DEFAULT 'completed',
+    created_by INT UNSIGNED NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    KEY idx_eload_tx_store_time (store_id, created_at),
+    CONSTRAINT fk_eload_tx_store FOREIGN KEY (store_id) REFERENCES stores(id) ON DELETE CASCADE,
+    CONSTRAINT fk_eload_tx_customer FOREIGN KEY (customer_id) REFERENCES customers(id) ON DELETE SET NULL,
+    CONSTRAINT fk_eload_tx_product FOREIGN KEY (eload_product_id) REFERENCES eload_products(id) ON DELETE SET NULL,
+    CONSTRAINT fk_eload_tx_user FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Payment breakdown per E-Load transaction — same shape as `payments`
+-- (one row per method per transaction), so a split E-Load payment is
+-- represented exactly the same way a split POS payment is.
+CREATE TABLE IF NOT EXISTS eload_payments (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    eload_transaction_id BIGINT UNSIGNED NOT NULL,
+    method ENUM('cash','gcash','utang','ewallet','bank_transfer','other') NOT NULL,
+    amount DECIMAL(10,2) NOT NULL,
+    reference_no VARCHAR(60) NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    KEY idx_eload_payments_tx (eload_transaction_id),
+    CONSTRAINT fk_eload_payments_tx FOREIGN KEY (eload_transaction_id) REFERENCES eload_transactions(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- max_amount NULL = no upper bound (open-ended top bracket).

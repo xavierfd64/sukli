@@ -201,12 +201,27 @@ class ReportController extends Controller
         ];
     }
 
+    /**
+     * Combines legacy manual-entry records (eload_records) with the current
+     * product-based ones (eload_transactions), normalized to the same
+     * column shape the view already renders, so this report keeps showing
+     * every E-Load transaction — old and new — in one list.
+     */
     private function eloadReport(int $storeId, string $from, string $to): array
     {
-        $rows = Database::all(
-            "SELECT * FROM eload_records WHERE store_id = ? AND DATE(transacted_at) BETWEEN ? AND ? ORDER BY transacted_at DESC",
+        $legacy = Database::all(
+            "SELECT transacted_at, customer_name, network, load_amount, amount_received, profit
+             FROM eload_records WHERE store_id = ? AND DATE(transacted_at) BETWEEN ? AND ?",
             [$storeId, $from, $to]
         );
+        $productBased = Database::all(
+            "SELECT created_at AS transacted_at, customer_name, network, load_value AS load_amount, selling_price AS amount_received, earnings AS profit
+             FROM eload_transactions WHERE store_id = ? AND status = 'completed' AND DATE(created_at) BETWEEN ? AND ?",
+            [$storeId, $from, $to]
+        );
+        $rows = array_merge($legacy, $productBased);
+        usort($rows, static fn (array $a, array $b) => strcmp($b['transacted_at'], $a['transacted_at']));
+
         return [
             'rows' => $rows,
             'total_load' => array_sum(array_column($rows, 'load_amount')),

@@ -22,7 +22,8 @@
             <div class="form-group"><label>Product Name</label><input class="form-control" name="name" placeholder="e.g. GoSAKTO 50" required></div>
         </div>
         <div class="form-row">
-            <div class="form-group"><label>Cost</label><input class="form-control eload-cost" type="number" step="0.01" min="0" name="cost" value="0" required></div>
+            <div class="form-group"><label>Load Value</label><input class="form-control" type="number" step="0.01" min="0" name="load_value" value="0" required><div class="form-hint">What the customer receives (promo value)</div></div>
+            <div class="form-group"><label>Store Cost</label><input class="form-control eload-cost" type="number" step="0.01" min="0" name="cost" value="0" required><div class="form-hint">What the store pays</div></div>
             <div class="form-group"><label>Additional Charge</label><input class="form-control eload-charge" type="number" step="0.01" min="0" name="additional_charge" value="0"></div>
             <div class="form-group">
                 <label>Selling Price</label>
@@ -37,7 +38,7 @@
 <div class="card">
     <div class="table-wrap">
         <table class="table">
-            <thead><tr><th>Network</th><th>Product</th><th>Cost</th><th>Additional Charge</th><th>Selling Price</th><th>Earnings</th><th>Status</th><th>Actions</th></tr></thead>
+            <thead><tr><th>Network</th><th>Product</th><th>Load Value</th><th>Store Cost</th><th>Additional Charge</th><th>Selling Price</th><th>Earnings</th><th>Status</th><th>Actions</th></tr></thead>
             <tbody>
             <?php foreach ($products as $p): $earnings = (float) $p['selling_price'] - (float) $p['cost']; $fid = 'eload-edit-' . $p['id']; ?>
                 <tr>
@@ -49,6 +50,7 @@
                             </select>
                         </td>
                         <td><input class="form-control form-control-sm" name="name" form="<?= $fid ?>" value="<?= e($p['name']) ?>" required style="min-width:140px;"></td>
+                        <td><input class="form-control form-control-sm" type="number" step="0.01" min="0" name="load_value" form="<?= $fid ?>" value="<?= e($p['load_value']) ?>" style="width:90px;" required></td>
                         <td><input class="form-control form-control-sm eload-cost" type="number" step="0.01" min="0" name="cost" form="<?= $fid ?>" value="<?= e($p['cost']) ?>" style="width:90px;" required></td>
                         <td><input class="form-control form-control-sm eload-charge" type="number" step="0.01" min="0" name="additional_charge" form="<?= $fid ?>" value="<?= e($p['additional_charge']) ?>" style="width:90px;"></td>
                         <td><input class="form-control form-control-sm eload-price" type="number" step="0.01" min="0" name="selling_price" form="<?= $fid ?>" value="<?= e($p['selling_price']) ?>" style="width:90px;" required></td>
@@ -63,7 +65,7 @@
                         </td>
                 </tr>
             <?php endforeach; ?>
-            <?php if (!$products): ?><tr><td colspan="8" class="text-muted">No E-Load products yet.</td></tr><?php endif; ?>
+            <?php if (!$products): ?><tr><td colspan="9" class="text-muted">No E-Load products yet.</td></tr><?php endif; ?>
             </tbody>
         </table>
     </div>

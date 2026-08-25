@@ -12,6 +12,7 @@ use Sukli\Core\Session;
 use Sukli\Services\AuditService;
 use Sukli\Services\CustomerSearchService;
 use Sukli\Services\PaymentMethodService;
+use Sukli\Services\PaymentProcessor;
 use Sukli\Services\StockService;
 use Sukli\Services\SystemSettingsService;
 use Sukli\Services\UtangService;
@@ -23,7 +24,7 @@ class PosController extends Controller
         $storeId = Auth::storeId();
 
         $products = Database::all(
-            "SELECT p.id, p.name, p.selling_price, p.current_stock, p.unit, p.barcode, c.name AS category_name
+            "SELECT p.id, p.name, p.selling_price, p.current_stock, p.unit, p.barcode, p.image_path, c.name AS category_name
              FROM products p LEFT JOIN product_categories c ON c.id = p.category_id
              WHERE p.store_id = ? AND p.status = 'active' AND p.current_stock > 0
              ORDER BY p.name ASC",
@@ -67,41 +68,11 @@ class PosController extends Controller
         }
 
         $paymentsRaw = json_decode((string) $request->input('payments_json', '[]'), true);
-        if (!is_array($paymentsRaw) || count($paymentsRaw) === 0) {
-            Session::flash('error', 'Please select a payment method.');
-            $this->redirect('/pos');
-        }
-
-        $enabledMethods = PaymentMethodService::enabled($storeId);
-        $isSplit = count($paymentsRaw) > 1;
-        $payments = [];
-        $paymentsSum = 0.0;
-        $usesUtang = false;
-
-        foreach ($paymentsRaw as $row) {
-            $method = (string) ($row['method'] ?? '');
-            $amount = round((float) ($row['amount'] ?? 0), 2);
-            if (!isset($enabledMethods[$method])) {
-                Session::flash('error', 'One of the selected payment methods is not available.');
-                $this->redirect('/pos');
-            }
-            if ($amount <= 0) {
-                Session::flash('error', 'Payment amounts must be greater than zero.');
-                $this->redirect('/pos');
-            }
-            if ($method === 'utang') {
-                $usesUtang = true;
-            }
-            $payments[] = ['method' => $method, 'amount' => $amount];
-            $paymentsSum += $amount;
+        if (!is_array($paymentsRaw)) {
+            $paymentsRaw = [];
         }
 
         $customerId = $request->input('customer_id') !== '' ? (int) $request->input('customer_id') : null;
-        if ($usesUtang && !$customerId) {
-            Session::flash('error', 'Select a customer for Utang sales.');
-            $this->redirect('/pos');
-        }
-
         $discountPercent = max(0, min(100, (float) $request->input('discount_percent', 0)));
 
         Database::beginTransaction();
@@ -138,25 +109,16 @@ class PosController extends Controller
             $discountAmount = round($subtotal * ($discountPercent / 100), 2);
             $total = max(0, $subtotal - $discountAmount);
 
-            $changeAmount = 0.0;
-            if ($isSplit) {
-                if (abs($paymentsSum - $total) > 0.01) {
-                    throw new \RuntimeException('Split payment amounts must add up to the total.');
-                }
-            } else {
-                $only = $payments[0];
-                if ($only['method'] === 'cash') {
-                    if ($only['amount'] < $total) {
-                        throw new \RuntimeException('Cash received is less than the total.');
-                    }
-                    $changeAmount = round($only['amount'] - $total, 2);
-                } elseif ($paymentsSum + 0.01 < $total) {
-                    throw new \RuntimeException('Payment amount is less than the total.');
-                }
-            }
+            $result = PaymentProcessor::process($paymentsRaw, $total, $storeId);
+            $payments = $result['payments'];
+            $isSplit = $result['isSplit'];
+            $paymentMethodLabel = $result['paymentMethodLabel'];
+            $amountTendered = $result['amountTendered'];
+            $changeAmount = $result['changeAmount'];
 
-            $paymentMethodLabel = $isSplit ? 'split' : $payments[0]['method'];
-            $amountTendered = $isSplit ? $paymentsSum : ($payments[0]['method'] === 'cash' ? $payments[0]['amount'] : $total);
+            if ($result['usesUtang'] && !$customerId) {
+                throw new \RuntimeException('Select a customer for Utang sales.');
+            }
 
             Database::execute(
                 "INSERT INTO sales (store_id, sale_number, customer_id, cashier_id, subtotal, discount_amount, total, payment_method, amount_tendered, change_amount, status, created_at)
