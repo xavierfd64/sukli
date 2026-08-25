@@ -8,6 +8,7 @@ use Sukli\Core\Auth;
 use Sukli\Core\Controller;
 use Sukli\Core\Database;
 use Sukli\Core\Request;
+use Sukli\Services\CustomerSearchService;
 use Sukli\Services\FeatureService;
 
 class ReportController extends Controller
@@ -23,6 +24,8 @@ class ReportController extends Controller
         'gcash' => 'GCash Records',
         'utang_balances' => 'Utang Balances',
         'utang_payments' => 'Utang Payments',
+        'customers' => 'Customers',
+        'suppliers' => 'Suppliers',
     ];
 
     public function index(Request $request): void
@@ -37,20 +40,6 @@ class ReportController extends Controller
         $from = $request->trimmed('from') ?: date('Y-m-01');
         $to = $request->trimmed('to') ?: date('Y-m-d');
 
-        $data = match ($report) {
-            'sales' => $this->salesReport($storeId, $from, $to),
-            'income' => $this->incomeReport($storeId, $from, $to),
-            'expense' => $this->expenseReport($storeId, $from, $to),
-            'net' => $this->netReport($storeId, $from, $to),
-            'low_stock' => $this->lowStockReport($storeId),
-            'inventory_value' => $this->inventoryValueReport($storeId),
-            'eload' => $this->eloadReport($storeId, $from, $to),
-            'gcash' => $this->gcashReport($storeId, $from, $to),
-            'utang_balances' => $this->utangBalancesReport($storeId),
-            'utang_payments' => $this->utangPaymentsReport($storeId, $from, $to),
-            default => [],
-        };
-
         $availableReports = self::REPORTS;
         if (empty($features['eload']['is_enabled'])) unset($availableReports['eload']);
         if (empty($features['gcash']['is_enabled'])) unset($availableReports['gcash']);
@@ -63,8 +52,74 @@ class ReportController extends Controller
             'reportLabel' => self::REPORTS[$report],
             'from' => $from,
             'to' => $to,
-            'data' => $data,
+            'data' => $this->generateReport($report, $storeId, $from, $to),
         ]);
+    }
+
+    public function exportCsv(Request $request): void
+    {
+        $storeId = (int) Auth::storeId();
+        $report = $request->input('report', 'sales');
+        if (!array_key_exists($report, self::REPORTS)) {
+            $report = 'sales';
+        }
+        $from = $request->trimmed('from') ?: date('Y-m-01');
+        $to = $request->trimmed('to') ?: date('Y-m-d');
+        $data = $this->generateReport($report, $storeId, $from, $to);
+
+        $columns = match ($report) {
+            'sales' => ['day' => 'Date', 'transactions' => 'Transactions', 'total' => 'Total'],
+            'income' => ['category' => 'Category', 'cnt' => 'Count', 'total' => 'Total'],
+            'expense' => ['category' => 'Category', 'cnt' => 'Count', 'total' => 'Total'],
+            'low_stock' => ['name' => 'Product', 'current_stock' => 'Current Stock', 'min_stock' => 'Min Stock', 'unit' => 'Unit'],
+            'inventory_value' => ['name' => 'Product', 'current_stock' => 'Stock', 'cost_value' => 'Cost Value', 'retail_value' => 'Retail Value'],
+            'eload' => ['transacted_at' => 'Date', 'customer_name' => 'Customer', 'network' => 'Network', 'load_amount' => 'Load', 'amount_received' => 'Received', 'profit' => 'Profit'],
+            'gcash' => ['transacted_at' => 'Date', 'type' => 'Type', 'amount' => 'Amount', 'service_charge' => 'Service Charge', 'customer_reference' => 'Reference'],
+            'utang_balances' => ['name' => 'Customer', 'outstanding_balance' => 'Outstanding Balance'],
+            'utang_payments' => ['created_at' => 'Date', 'customer_name' => 'Customer', 'amount' => 'Amount', 'payment_method' => 'Method'],
+            'customers' => ['name' => 'Name', 'contact_number' => 'Contact Number', 'status' => 'Status', 'outstanding_balance' => 'Outstanding Balance'],
+            'suppliers' => ['display_name' => 'Supplier', 'contact_person' => 'Contact Person', 'contact_number' => 'Contact Number', 'address' => 'Address', 'status' => 'Status'],
+            default => [],
+        };
+
+        header('Content-Type: text/csv; charset=utf-8');
+        header('Content-Disposition: attachment; filename="sukli-' . $report . '-' . date('Ymd-His') . '.csv"');
+
+        $out = fopen('php://output', 'w');
+        if ($report === 'net') {
+            fputcsv($out, ['Metric', 'Amount'], ',', '"', '\\');
+            fputcsv($out, ['POS Sales', $data['sales']], ',', '"', '\\');
+            fputcsv($out, ['Other Income', $data['other_income']], ',', '"', '\\');
+            fputcsv($out, ['Total Income', $data['total_income']], ',', '"', '\\');
+            fputcsv($out, ['Expenses', $data['expenses']], ',', '"', '\\');
+            fputcsv($out, ['Net Income', $data['net']], ',', '"', '\\');
+        } else {
+            fputcsv($out, array_values($columns), ',', '"', '\\');
+            foreach (($data['rows'] ?? []) as $row) {
+                fputcsv($out, array_map(fn ($key) => $row[$key] ?? '', array_keys($columns)), ',', '"', '\\');
+            }
+        }
+        fclose($out);
+        exit;
+    }
+
+    private function generateReport(string $report, int $storeId, string $from, string $to): array
+    {
+        return match ($report) {
+            'sales' => $this->salesReport($storeId, $from, $to),
+            'income' => $this->incomeReport($storeId, $from, $to),
+            'expense' => $this->expenseReport($storeId, $from, $to),
+            'net' => $this->netReport($storeId, $from, $to),
+            'low_stock' => $this->lowStockReport($storeId),
+            'inventory_value' => $this->inventoryValueReport($storeId),
+            'eload' => $this->eloadReport($storeId, $from, $to),
+            'gcash' => $this->gcashReport($storeId, $from, $to),
+            'utang_balances' => $this->utangBalancesReport($storeId),
+            'utang_payments' => $this->utangPaymentsReport($storeId, $from, $to),
+            'customers' => $this->customersReport($storeId),
+            'suppliers' => $this->suppliersReport($storeId),
+            default => [],
+        };
     }
 
     private function salesReport(int $storeId, string $from, string $to): array
@@ -165,22 +220,59 @@ class ReportController extends Controller
     private function utangBalancesReport(int $storeId): array
     {
         $rows = Database::all(
-            "SELECT c.name, cca.outstanding_balance FROM customer_credit_accounts cca
+            "SELECT c.first_name, c.last_name, cca.outstanding_balance FROM customer_credit_accounts cca
              JOIN customers c ON c.id = cca.customer_id
              WHERE cca.store_id = ? AND cca.outstanding_balance > 0 ORDER BY cca.outstanding_balance DESC",
             [$storeId]
         );
+        foreach ($rows as &$row) {
+            $row['name'] = CustomerSearchService::fullName($row);
+        }
         return ['rows' => $rows, 'total' => array_sum(array_column($rows, 'outstanding_balance'))];
     }
 
     private function utangPaymentsReport(int $storeId, string $from, string $to): array
     {
         $rows = Database::all(
-            "SELECT up.*, c.name AS customer_name FROM utang_payments up
+            "SELECT up.*, c.first_name, c.last_name FROM utang_payments up
              JOIN customers c ON c.id = up.customer_id
              WHERE up.store_id = ? AND DATE(up.created_at) BETWEEN ? AND ? ORDER BY up.created_at DESC",
             [$storeId, $from, $to]
         );
+        foreach ($rows as &$row) {
+            $row['customer_name'] = CustomerSearchService::fullName($row);
+        }
         return ['rows' => $rows, 'total' => array_sum(array_column($rows, 'amount'))];
+    }
+
+    private function customersReport(int $storeId): array
+    {
+        $rows = Database::all(
+            "SELECT c.first_name, c.last_name, c.contact_number, c.status,
+                    COALESCE(cca.outstanding_balance, 0) AS outstanding_balance
+             FROM customers c
+             LEFT JOIN customer_credit_accounts cca ON cca.customer_id = c.id
+             WHERE c.store_id = ? ORDER BY c.first_name, c.last_name",
+            [$storeId]
+        );
+        foreach ($rows as &$row) {
+            $row['name'] = CustomerSearchService::fullName($row);
+        }
+        return ['rows' => $rows, 'total' => count($rows)];
+    }
+
+    private function suppliersReport(int $storeId): array
+    {
+        $rows = Database::all(
+            "SELECT company_name, contact_first_name, contact_last_name, contact_number, address, status
+             FROM suppliers WHERE store_id = ? ORDER BY company_name, contact_first_name",
+            [$storeId]
+        );
+        foreach ($rows as &$row) {
+            $contact = trim(($row['contact_first_name'] ?? '') . ' ' . ($row['contact_last_name'] ?? ''));
+            $row['display_name'] = $row['company_name'] ?: $contact ?: 'Unnamed Supplier';
+            $row['contact_person'] = $contact;
+        }
+        return ['rows' => $rows, 'total' => count($rows)];
     }
 }

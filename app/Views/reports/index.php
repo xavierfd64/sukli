@@ -5,12 +5,17 @@
 /** @var string $from */
 /** @var string $to */
 /** @var array $data */
-$needsDateRange = !in_array($report, ['low_stock', 'inventory_value', 'utang_balances'], true);
+$needsDateRange = !in_array($report, ['low_stock', 'inventory_value', 'utang_balances', 'customers', 'suppliers'], true);
 ?>
-<h2 style="margin-top:0;">Reports</h2>
-<p class="text-muted">Practical reports for day-to-day store decisions</p>
+<div class="flex items-center justify-between mb-8" style="flex-wrap:wrap;gap:10px;">
+    <div>
+        <h2 style="margin:0;">Reports</h2>
+        <p class="text-muted" style="margin:0;">Practical reports for day-to-day store decisions</p>
+    </div>
+    <a href="<?= url('/reports/export.csv?' . http_build_query(['report' => $report, 'from' => $from, 'to' => $to])) ?>" class="btn btn-outline"><?= icon('reports', 16) ?> Download CSV</a>
+</div>
 
-<div class="section-tabs" style="flex-wrap:wrap;">
+<div class="section-tabs" style="flex-wrap:wrap;margin-top:12px;">
     <?php foreach ($reports as $key => $label): ?>
         <a href="<?= url('/reports?report=' . $key . '&from=' . $from . '&to=' . $to) ?>" class="<?= $key === $report ? 'is-active' : '' ?>"><?= e($label) ?></a>
     <?php endforeach; ?>
@@ -138,6 +143,28 @@ $needsDateRange = !in_array($report, ['low_stock', 'inventory_value', 'utang_bal
         <?php if (!$data['rows']): ?><tr><td colspan="4" class="text-muted">No payments in this period.</td></tr><?php endif; ?>
         </tbody>
         <tfoot><tr><td colspan="2" style="font-weight:700;">Total</td><td style="font-weight:700;"><?= money($data['total']) ?></td></tr></tfoot>
+    </table></div>
+
+<?php elseif ($report === 'customers'): ?>
+    <div class="card-title">Customers</div>
+    <div class="table-wrap"><table class="table">
+        <thead><tr><th>Name</th><th>Contact Number</th><th>Status</th><th>Outstanding Balance</th></tr></thead>
+        <tbody>
+        <?php foreach ($data['rows'] as $r): ?><tr><td><?= e($r['name']) ?></td><td class="text-muted"><?= e($r['contact_number'] ?? '—') ?></td><td><span class="badge <?= $r['status'] === 'active' ? 'badge-green' : 'badge-gray' ?>"><?= e(ucfirst($r['status'])) ?></span></td><td><?= money($r['outstanding_balance']) ?></td></tr><?php endforeach; ?>
+        <?php if (!$data['rows']): ?><tr><td colspan="4" class="text-muted">No customers yet.</td></tr><?php endif; ?>
+        </tbody>
+        <tfoot><tr><td colspan="3" style="font-weight:700;">Total Customers</td><td style="font-weight:700;"><?= $data['total'] ?></td></tr></tfoot>
+    </table></div>
+
+<?php elseif ($report === 'suppliers'): ?>
+    <div class="card-title">Suppliers</div>
+    <div class="table-wrap"><table class="table">
+        <thead><tr><th>Supplier</th><th>Contact Person</th><th>Contact Number</th><th>Address</th><th>Status</th></tr></thead>
+        <tbody>
+        <?php foreach ($data['rows'] as $r): ?><tr><td><?= e($r['display_name']) ?></td><td class="text-muted"><?= e($r['contact_person'] ?: '—') ?></td><td class="text-muted"><?= e($r['contact_number'] ?? '—') ?></td><td class="text-muted"><?= e($r['address'] ?? '—') ?></td><td><span class="badge <?= $r['status'] === 'active' ? 'badge-green' : 'badge-gray' ?>"><?= e(ucfirst($r['status'])) ?></span></td></tr><?php endforeach; ?>
+        <?php if (!$data['rows']): ?><tr><td colspan="5" class="text-muted">No suppliers yet.</td></tr><?php endif; ?>
+        </tbody>
+        <tfoot><tr><td colspan="4" style="font-weight:700;">Total Suppliers</td><td style="font-weight:700;"><?= $data['total'] ?></td></tr></tfoot>
     </table></div>
 <?php endif; ?>
 </div>

@@ -127,6 +127,7 @@ $router->post('/roles/{id}/delete', [RoleController::class, 'destroy'], [$auth, 
 
 // -- Reports -----------------------------------------------------------------
 $router->get('/reports', [ReportController::class, 'index'], [$auth, $perm('reports', 'view')]);
+$router->get('/reports/export.csv', [ReportController::class, 'exportCsv'], [$auth, $perm('reports', 'view')]);
 
 // -- Settings / Feature Management --------------------------------------------
 $router->get('/settings', [SettingsController::class, 'index'], [$auth, $perm('settings', 'manage')]);
