@@ -3,6 +3,9 @@
 /** @var array $categories */
 /** @var array $summary */
 /** @var string $phpVersion */
+/** @var string $appVersion */
+/** @var string $installationId */
+/** @var bool $autoUpdateEnabled */
 /** @var bool $autoPrintReceipt */
 /** @var string $receiptHeader */
 /** @var bool $receiptShowAddress */
@@ -232,12 +235,30 @@
         <div class="flex items-center justify-between" style="font-size:13px;margin-bottom:8px;"><span class="text-muted">Expenses (Today)</span><strong><?= money($summary['expense_today']) ?></strong></div>
         <div class="flex items-center justify-between" style="font-size:13px;"><span class="text-muted">Net Income (Today)</span><strong><?= money((float) $summary['sales_today'] + (float) $summary['income_today'] - (float) $summary['expense_today']) ?></strong></div>
     </div>
-    <div class="card">
+    <div class="card mb-16">
         <div class="card-title">About System</div>
-        <div class="flex items-center justify-between" style="font-size:12.5px;margin-bottom:6px;"><span class="text-muted">System Name</span><span>Sukli — A Store System</span></div>
-        <div class="flex items-center justify-between" style="font-size:12.5px;margin-bottom:6px;"><span class="text-muted">Version</span><span>1.0.0</span></div>
+        <div class="flex items-center justify-between" style="font-size:12.5px;margin-bottom:6px;"><span class="text-muted">System Name</span><span><?= e(app_version_info()['name']) ?></span></div>
+        <div class="flex items-center justify-between" style="font-size:12.5px;margin-bottom:6px;"><span class="text-muted">Version</span><span><?= e($appVersion) ?></span></div>
         <div class="flex items-center justify-between" style="font-size:12.5px;margin-bottom:6px;"><span class="text-muted">PHP Version</span><span><?= e($phpVersion) ?></span></div>
-        <div class="flex items-center justify-between" style="font-size:12.5px;"><span class="text-muted">Database</span><span class="badge badge-green">Connected</span></div>
+        <div class="flex items-center justify-between" style="font-size:12.5px;margin-bottom:6px;"><span class="text-muted">Database</span><span class="badge badge-green">Connected</span></div>
+        <div class="flex items-center justify-between" style="font-size:12.5px;"><span class="text-muted">Installation ID</span><span style="font-family:monospace;font-size:11.5px;"><?= e($installationId) ?></span></div>
+    </div>
+
+    <div class="card">
+        <div class="card-title">Updates</div>
+        <p class="text-muted" style="font-size:12.5px;margin-top:-4px;">
+            Sukli does not check for or install updates automatically yet. This setting will control that
+            once the update system is available: when off, you'll be notified of a new version here and can
+            choose when to update; when on, updates you're subscribed to can install automatically.
+        </p>
+        <form method="post" action="<?= url('/settings/system') ?>">
+            <?= csrf_field() ?>
+            <label class="flex items-center gap-8" style="font-size:13px;cursor:pointer;">
+                <input type="checkbox" name="auto_update_enabled" value="1" <?= $autoUpdateEnabled ? 'checked' : '' ?>>
+                Enable Auto Update
+            </label>
+            <button type="submit" class="btn btn-outline btn-sm mt-8">Save</button>
+        </form>
     </div>
 </div>
 </div>

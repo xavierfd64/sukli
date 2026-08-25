@@ -136,6 +136,7 @@ $router->get('/reports/export.csv', [ReportController::class, 'exportCsv'], [$au
 $router->get('/settings', [SettingsController::class, 'index'], [$auth, $perm('settings', 'manage')]);
 $router->post('/settings/general', [SettingsController::class, 'updateGeneral'], [$auth, $perm('settings', 'manage'), $csrf]);
 $router->post('/settings/receipt', [SettingsController::class, 'updateReceipt'], [$auth, $perm('settings', 'manage'), $csrf]);
+$router->post('/settings/system', [SettingsController::class, 'updateSystem'], [$auth, $perm('settings', 'manage'), $csrf]);
 $router->get('/settings/features', [SettingsController::class, 'features'], [$auth, $perm('settings', 'manage')]);
 $router->post('/settings/features', [SettingsController::class, 'updateFeatures'], [$auth, $perm('settings', 'manage'), $csrf]);
 $router->get('/settings/payment-methods', [SettingsController::class, 'paymentMethods'], [$auth, $perm('settings', 'manage')]);

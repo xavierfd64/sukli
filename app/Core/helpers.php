@@ -29,6 +29,21 @@ function config_value(string $key, mixed $default = null): mixed
     return $config[$key] ?? $default;
 }
 
+/** @return array{version:string,name:string} The full contents of config/version.php — the one place the app version is defined. */
+function app_version_info(): array
+{
+    static $info = null;
+    if ($info === null) {
+        $info = require __DIR__ . '/../../config/version.php';
+    }
+    return $info;
+}
+
+function app_version(): string
+{
+    return (string) app_version_info()['version'];
+}
+
 /**
  * Builds an absolute URL for the given app-relative path. Scheme, host and
  * subfolder are computed from the current request (see

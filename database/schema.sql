@@ -490,6 +490,17 @@ CREATE TABLE IF NOT EXISTS system_settings (
     CONSTRAINT fk_settings_store FOREIGN KEY (store_id) REFERENCES stores(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- Single-row table (id is always 1) holding this deployment's unique
+-- Installation ID — one per installed copy of Sukli, independent of any
+-- store/organization, generated once and never changed. Stored in the
+-- database (not a file) so it survives even on shared hosting where the
+-- config/ folder may be locked to read-only after install completes.
+CREATE TABLE IF NOT EXISTS installation (
+    id TINYINT UNSIGNED NOT NULL PRIMARY KEY DEFAULT 1,
+    installation_id VARCHAR(40) NOT NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 -- ---------------------------------------------------------------------------
 -- Audit Log
 -- ---------------------------------------------------------------------------

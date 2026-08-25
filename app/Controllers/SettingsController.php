@@ -14,6 +14,7 @@ use Sukli\Services\EloadProductService;
 use Sukli\Services\ExpenseCategoryService;
 use Sukli\Services\FeatureService;
 use Sukli\Services\GcashChargeBracketService;
+use Sukli\Services\InstallationIdentity;
 use Sukli\Services\NetworkService;
 use Sukli\Services\PaymentMethodService;
 use Sukli\Services\SystemSettingsService;
@@ -42,6 +43,9 @@ class SettingsController extends Controller
             'categories' => $categories,
             'summary' => $summary,
             'phpVersion' => PHP_VERSION,
+            'appVersion' => app_version(),
+            'installationId' => InstallationIdentity::id(),
+            'autoUpdateEnabled' => SystemSettingsService::getBool((int) $storeId, 'auto_update_enabled', false),
             'timezones' => TimezoneService::all(),
             'autoPrintReceipt' => SystemSettingsService::getBool((int) $storeId, 'auto_print_receipt'),
             'receiptHeader' => SystemSettingsService::get((int) $storeId, 'receipt_header') ?? '',
@@ -140,6 +144,17 @@ class SettingsController extends Controller
         AuditService::log('update', 'settings', 'payment_methods', $storeId, null, $input);
         Session::flash('success', 'Payment method settings saved.');
         $this->redirect('/settings/payment-methods');
+    }
+
+    public function updateSystem(Request $request): void
+    {
+        $storeId = (int) Auth::storeId();
+        $enabled = $request->input('auto_update_enabled') !== null;
+
+        SystemSettingsService::set($storeId, 'auto_update_enabled', $enabled ? '1' : '0');
+        AuditService::log('update', 'settings', 'system', 0, null, ['auto_update_enabled' => $enabled]);
+        Session::flash('success', 'Update settings saved.');
+        $this->redirect('/settings');
     }
 
     public function networks(Request $request): void
