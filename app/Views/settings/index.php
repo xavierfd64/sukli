@@ -34,6 +34,15 @@
                 <div class="form-group"><label>Currency Symbol</label><input class="form-control" name="currency_symbol" value="<?= e($store['currency_symbol']) ?>"></div>
                 <div class="form-group"><label>Tax Rate (%)</label><input class="form-control" type="number" step="0.01" min="0" name="tax_rate" value="<?= e((string) $store['tax_rate']) ?>"></div>
             </div>
+            <div class="form-group">
+                <label>Timezone</label>
+                <select class="form-control" name="timezone">
+                    <?php foreach ($timezones as $tz): ?>
+                        <option value="<?= e($tz) ?>" <?= $tz === $store['timezone'] ? 'selected' : '' ?>><?= e($tz) ?></option>
+                    <?php endforeach; ?>
+                </select>
+                <div class="form-hint">Used for "today", reports, and all recorded timestamps throughout Sukli.</div>
+            </div>
             <div class="form-group"><label>Receipt Footer</label><input class="form-control" name="receipt_footer" value="<?= e($store['receipt_footer'] ?? '') ?>"></div>
             <button type="submit" class="btn btn-primary">Save General Settings</button>
         </form>

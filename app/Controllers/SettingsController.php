@@ -11,6 +11,7 @@ use Sukli\Core\Request;
 use Sukli\Core\Session;
 use Sukli\Services\AuditService;
 use Sukli\Services\FeatureService;
+use Sukli\Services\TimezoneService;
 
 class SettingsController extends Controller
 {
@@ -34,6 +35,7 @@ class SettingsController extends Controller
             'categories' => $categories,
             'summary' => $summary,
             'phpVersion' => PHP_VERSION,
+            'timezones' => TimezoneService::all(),
         ]);
     }
 
@@ -42,16 +44,21 @@ class SettingsController extends Controller
         $storeId = Auth::storeId();
         $existing = Database::one("SELECT * FROM stores WHERE id = ?", [$storeId]);
 
+        $timezone = $request->trimmed('timezone') ?: 'Asia/Manila';
+        if (!TimezoneService::isValid($timezone)) {
+            $timezone = $existing['timezone'] ?? 'Asia/Manila';
+        }
+
         Database::execute(
-            "UPDATE stores SET name=?, address=?, phone=?, currency_symbol=?, tax_rate=?, receipt_footer=?, updated_at=NOW() WHERE id = ?",
+            "UPDATE stores SET name=?, address=?, phone=?, currency_symbol=?, tax_rate=?, receipt_footer=?, timezone=?, updated_at=NOW() WHERE id = ?",
             [
                 $request->trimmed('name'), $request->trimmed('address') ?: null, $request->trimmed('phone') ?: null,
                 $request->trimmed('currency_symbol') ?: '₱', (float) $request->input('tax_rate', 0),
-                $request->trimmed('receipt_footer') ?: null, $storeId,
+                $request->trimmed('receipt_footer') ?: null, $timezone, $storeId,
             ]
         );
 
-        AuditService::log('update', 'settings', 'store', $storeId, $existing, $request->only(['name', 'address', 'phone', 'currency_symbol', 'tax_rate', 'receipt_footer']));
+        AuditService::log('update', 'settings', 'store', $storeId, $existing, $request->only(['name', 'address', 'phone', 'currency_symbol', 'tax_rate', 'receipt_footer', 'timezone']));
         Session::flash('success', 'Store settings updated.');
         $this->redirect('/settings');
     }

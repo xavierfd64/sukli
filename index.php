@@ -30,6 +30,7 @@ use Sukli\Core\Installer;
 use Sukli\Core\Session;
 use Sukli\Core\Request;
 use Sukli\Core\Router;
+use Sukli\Services\TimezoneService;
 
 Env::load(__DIR__ . '/.env');
 
@@ -58,6 +59,10 @@ if (!Installer::isInstalled() && !str_starts_with($request->path(), '/install'))
     header('Location: ' . url('/install'));
     exit;
 }
+
+// Applies the logged-in store's chosen timezone to both PHP and MySQL for
+// the rest of the request (see TimezoneService) — a no-op pre-login/install.
+TimezoneService::apply();
 
 $router = new Router();
 (function (Router $router) {
