@@ -10,7 +10,8 @@ use Sukli\Core\Database;
 use Sukli\Core\Request;
 use Sukli\Core\Session;
 use Sukli\Services\AuditService;
-use Sukli\Services\FeatureService;
+use Sukli\Services\CustomerSearchService;
+use Sukli\Services\PaymentMethodService;
 use Sukli\Services\StockService;
 use Sukli\Services\UtangService;
 
@@ -34,8 +35,18 @@ class PosController extends Controller
             $categories[$cat] = true;
         }
 
-        $customers = Database::all(
-            "SELECT id, name FROM customers WHERE store_id = ? AND status = 'active' ORDER BY name",
+        $customerRows = Database::all(
+            "SELECT id, first_name, last_name, contact_number FROM customers WHERE store_id = ? AND status = 'active' ORDER BY first_name, last_name",
+            [$storeId]
+        );
+        $customers = array_map(static fn (array $c) => [
+            'id' => (int) $c['id'],
+            'name' => CustomerSearchService::fullName($c),
+            'contact_number' => $c['contact_number'],
+        ], $customerRows);
+
+        $autoPrintRow = Database::one(
+            "SELECT setting_value FROM system_settings WHERE store_id = ? AND setting_key = 'auto_print_receipt'",
             [$storeId]
         );
 
@@ -44,7 +55,8 @@ class PosController extends Controller
             'products' => $products,
             'categories' => array_keys($categories),
             'customers' => $customers,
-            'features' => FeatureService::all((int) $storeId),
+            'paymentMethods' => PaymentMethodService::enabled((int) $storeId),
+            'autoPrintReceipt' => (bool) ($autoPrintRow['setting_value'] ?? false),
         ]);
     }
 
@@ -59,18 +71,38 @@ class PosController extends Controller
             $this->redirect('/pos');
         }
 
-        $paymentMethod = $request->input('payment_method', '');
-        if (!in_array($paymentMethod, ['cash', 'gcash', 'utang'], true)) {
+        $paymentsRaw = json_decode((string) $request->input('payments_json', '[]'), true);
+        if (!is_array($paymentsRaw) || count($paymentsRaw) === 0) {
             Session::flash('error', 'Please select a payment method.');
             $this->redirect('/pos');
         }
-        if ($paymentMethod !== 'cash' && !FeatureService::isEnabled($storeId, $paymentMethod)) {
-            Session::flash('error', 'That payment method is currently disabled.');
-            $this->redirect('/pos');
+
+        $enabledMethods = PaymentMethodService::enabled($storeId);
+        $isSplit = count($paymentsRaw) > 1;
+        $payments = [];
+        $paymentsSum = 0.0;
+        $usesUtang = false;
+
+        foreach ($paymentsRaw as $row) {
+            $method = (string) ($row['method'] ?? '');
+            $amount = round((float) ($row['amount'] ?? 0), 2);
+            if (!isset($enabledMethods[$method])) {
+                Session::flash('error', 'One of the selected payment methods is not available.');
+                $this->redirect('/pos');
+            }
+            if ($amount <= 0) {
+                Session::flash('error', 'Payment amounts must be greater than zero.');
+                $this->redirect('/pos');
+            }
+            if ($method === 'utang') {
+                $usesUtang = true;
+            }
+            $payments[] = ['method' => $method, 'amount' => $amount];
+            $paymentsSum += $amount;
         }
 
         $customerId = $request->input('customer_id') !== '' ? (int) $request->input('customer_id') : null;
-        if ($paymentMethod === 'utang' && !$customerId) {
+        if ($usesUtang && !$customerId) {
             Session::flash('error', 'Select a customer for Utang sales.');
             $this->redirect('/pos');
         }
@@ -111,23 +143,30 @@ class PosController extends Controller
             $discountAmount = round($subtotal * ($discountPercent / 100), 2);
             $total = max(0, $subtotal - $discountAmount);
 
-            $amountTendered = null;
-            $changeAmount = null;
-            if ($paymentMethod === 'cash') {
-                $amountTendered = (float) $request->input('amount_tendered', $total);
-                if ($amountTendered < $total) {
-                    throw new \RuntimeException('Cash received is less than the total.');
+            $changeAmount = 0.0;
+            if ($isSplit) {
+                if (abs($paymentsSum - $total) > 0.01) {
+                    throw new \RuntimeException('Split payment amounts must add up to the total.');
                 }
-                $changeAmount = round($amountTendered - $total, 2);
-            } elseif ($paymentMethod === 'gcash') {
-                $amountTendered = $total;
-                $changeAmount = 0;
+            } else {
+                $only = $payments[0];
+                if ($only['method'] === 'cash') {
+                    if ($only['amount'] < $total) {
+                        throw new \RuntimeException('Cash received is less than the total.');
+                    }
+                    $changeAmount = round($only['amount'] - $total, 2);
+                } elseif ($paymentsSum + 0.01 < $total) {
+                    throw new \RuntimeException('Payment amount is less than the total.');
+                }
             }
+
+            $paymentMethodLabel = $isSplit ? 'split' : $payments[0]['method'];
+            $amountTendered = $isSplit ? $paymentsSum : ($payments[0]['method'] === 'cash' ? $payments[0]['amount'] : $total);
 
             Database::execute(
                 "INSERT INTO sales (store_id, sale_number, customer_id, cashier_id, subtotal, discount_amount, total, payment_method, amount_tendered, change_amount, status, created_at)
                  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'completed', NOW())",
-                [$storeId, 'TEMP', $customerId, Auth::id(), $subtotal, $discountAmount, $total, $paymentMethod, $amountTendered, $changeAmount]
+                [$storeId, 'TEMP', $customerId, Auth::id(), $subtotal, $discountAmount, $total, $paymentMethodLabel, $amountTendered, $changeAmount]
             );
             $saleId = (int) Database::lastInsertId();
             $saleNumber = str_pad((string) $saleId, 6, '0', STR_PAD_LEFT);
@@ -141,17 +180,22 @@ class PosController extends Controller
                 StockService::record($storeId, $li['product_id'], 'sale_out', $li['qty'], 'sale', $saleId, "Sale #{$saleNumber}");
             }
 
-            Database::execute(
-                "INSERT INTO payments (sale_id, method, amount, created_at) VALUES (?, ?, ?, NOW())",
-                [$saleId, $paymentMethod, $total]
-            );
-
-            if ($paymentMethod === 'utang') {
-                UtangService::recordSaleCredit($storeId, (int) $customerId, $saleId, $total);
+            foreach ($payments as $p) {
+                $recordedAmount = $isSplit ? $p['amount'] : $total;
+                Database::execute(
+                    "INSERT INTO payments (sale_id, method, amount, created_at) VALUES (?, ?, ?, NOW())",
+                    [$saleId, $p['method'], $recordedAmount]
+                );
+                if ($p['method'] === 'utang') {
+                    UtangService::recordSaleCredit($storeId, (int) $customerId, $saleId, $recordedAmount);
+                }
             }
 
             AuditService::log('sale_completed', 'pos', 'sale', $saleId, null, [
-                'sale_number' => $saleNumber, 'total' => $total, 'payment_method' => $paymentMethod,
+                'sale_number' => $saleNumber,
+                'total' => $total,
+                'payment_method' => $paymentMethodLabel,
+                'payments' => $payments,
             ]);
 
             Database::commit();
@@ -170,7 +214,7 @@ class PosController extends Controller
         $storeId = Auth::storeId();
 
         $sale = Database::one(
-            "SELECT s.*, u.name AS cashier_name, c.name AS customer_name
+            "SELECT s.*, u.name AS cashier_name, c.first_name AS customer_first_name, c.last_name AS customer_last_name
              FROM sales s
              JOIN users u ON u.id = s.cashier_id
              LEFT JOIN customers c ON c.id = s.customer_id
@@ -183,13 +227,20 @@ class PosController extends Controller
         }
 
         $items = Database::all("SELECT * FROM sale_items WHERE sale_id = ?", [$id]);
+        $payments = Database::all("SELECT * FROM payments WHERE sale_id = ? ORDER BY id", [$id]);
         $store = Database::one("SELECT * FROM stores WHERE id = ?", [$storeId]);
+        $autoPrintRow = Database::one(
+            "SELECT setting_value FROM system_settings WHERE store_id = ? AND setting_key = 'auto_print_receipt'",
+            [$storeId]
+        );
 
         $this->view('pos/receipt', [
             'pageTitle' => 'Receipt #' . $sale['sale_number'],
             'sale' => $sale,
             'items' => $items,
+            'payments' => $payments,
             'store' => $store,
+            'autoPrintReceipt' => (bool) ($autoPrintRow['setting_value'] ?? false),
         ]);
     }
 }

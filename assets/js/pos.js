@@ -2,7 +2,8 @@
   "use strict";
 
   var cart = {}; // productId -> {id, name, price, qty, stock}
-  var selectedMethod = null;
+  var paymentMethods = window.SUKLI_PAYMENT_METHODS || [];
+  var customers = window.SUKLI_CUSTOMERS || [];
 
   var grid = document.getElementById("pos-grid");
   var searchInput = document.getElementById("pos-search");
@@ -13,12 +14,7 @@
   var subtotalEl = document.getElementById("pos-subtotal");
   var totalEl = document.getElementById("pos-total");
   var discountInput = document.getElementById("pos-discount");
-  var submitBtn = document.getElementById("pos-submit");
-  var cashGroup = document.getElementById("pos-cash-group");
-  var tenderedInput = document.getElementById("pos-tendered");
-  var changeEl = document.getElementById("pos-change");
-  var customerGroup = document.getElementById("pos-customer-group");
-  var customerSelect = document.getElementById("pos-customer");
+  var openPaymentBtn = document.getElementById("pos-open-payment");
 
   function money(n) {
     return window.SUKLI_CURRENCY + (Math.round(n * 100) / 100).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -81,19 +77,43 @@
     });
   }
 
-  if (barcodeInput) {
+  // --- Barcode: auto-detect on scan (no Enter required), with Enter as a manual fallback. ---
+  if (barcodeInput && grid) {
+    var barcodeMap = {};
+    grid.querySelectorAll(".pos-product").forEach(function (el) {
+      var bc = el.getAttribute("data-barcode");
+      if (bc) barcodeMap[bc] = el;
+    });
+
+    var barcodeDebounce = null;
+
+    function tryAutoScan() {
+      var code = barcodeInput.value.trim();
+      if (!code) return;
+      var found = barcodeMap[code];
+      if (found) {
+        addToCart(found);
+        barcodeInput.value = "";
+      }
+    }
+
+    barcodeInput.addEventListener("input", function () {
+      if (barcodeDebounce) clearTimeout(barcodeDebounce);
+      barcodeDebounce = setTimeout(tryAutoScan, 120);
+    });
+
     barcodeInput.addEventListener("keydown", function (e) {
       if (e.key !== "Enter") return;
       e.preventDefault();
+      if (barcodeDebounce) clearTimeout(barcodeDebounce);
       var code = barcodeInput.value.trim();
-      barcodeInput.value = "";
       if (!code) return;
-
-      var found = grid.querySelector('.pos-product[data-barcode="' + CSS.escape(code) + '"]');
-      if (found) {
-        addToCart(found);
+      if (barcodeMap[code]) {
+        addToCart(barcodeMap[code]);
+        barcodeInput.value = "";
       } else {
         alert("No product found for barcode: " + code);
+        barcodeInput.value = "";
       }
       barcodeInput.focus();
     });
@@ -128,7 +148,7 @@
     Object.keys(cart).forEach(function (id) { subtotal += cart[id].price * cart[id].qty; });
     var discountPct = Math.max(0, Math.min(100, parseFloat(discountInput.value) || 0));
     var total = subtotal - subtotal * (discountPct / 100);
-    return { subtotal: subtotal, discountPct: discountPct, total: total };
+    return { subtotal: subtotal, discountPct: discountPct, total: Math.round(total * 100) / 100 };
   }
 
   function renderCart() {
@@ -157,39 +177,10 @@
     var t = totals();
     subtotalEl.textContent = money(t.subtotal);
     totalEl.textContent = money(t.total);
-    updateChange();
-    updateSubmitState();
+    openPaymentBtn.disabled = ids.length === 0;
   }
 
   if (discountInput) discountInput.addEventListener("input", renderCart);
-
-  document.querySelectorAll(".pay-btn").forEach(function (btn) {
-    btn.addEventListener("click", function () {
-      selectedMethod = btn.getAttribute("data-method");
-      document.querySelectorAll(".pay-btn").forEach(function (b) { b.classList.remove("is-selected"); });
-      btn.classList.add("is-selected");
-      cashGroup.style.display = selectedMethod === "cash" ? "block" : "none";
-      if (customerGroup) customerGroup.style.display = selectedMethod === "utang" ? "block" : "none";
-      updateChange();
-      updateSubmitState();
-    });
-  });
-
-  function updateChange() {
-    if (!tenderedInput) return;
-    var t = totals();
-    var tendered = parseFloat(tenderedInput.value) || 0;
-    changeEl.textContent = money(Math.max(0, tendered - t.total));
-  }
-  if (tenderedInput) tenderedInput.addEventListener("input", updateChange);
-
-  function updateSubmitState() {
-    var hasItems = Object.keys(cart).length > 0;
-    var ok = hasItems && !!selectedMethod;
-    if (selectedMethod === "utang" && customerSelect && !customerSelect.value) ok = false;
-    submitBtn.disabled = !ok;
-  }
-  if (customerSelect) customerSelect.addEventListener("change", updateSubmitState);
 
   var clearBtn = document.getElementById("pos-clear-cart");
   if (clearBtn) {
@@ -200,22 +191,260 @@
     });
   }
 
-  var form = document.getElementById("pos-form");
-  if (form) {
-    form.addEventListener("submit", function (e) {
-      var t = totals();
-      var payload = Object.keys(cart).map(function (id) { return { id: id, qty: cart[id].qty }; });
-      document.getElementById("pos-cart-json").value = JSON.stringify(payload);
-      document.getElementById("pos-payment-method").value = selectedMethod || "";
-      document.getElementById("pos-discount-hidden").value = t.discountPct;
-      document.getElementById("pos-tendered-hidden").value = tenderedInput ? (tenderedInput.value || t.total) : t.total;
-      document.getElementById("pos-customer-hidden").value = customerSelect ? customerSelect.value : "";
+  renderCart();
 
-      if (payload.length === 0 || !selectedMethod) {
-        e.preventDefault();
-      }
+  // --------------------------------------------------------------------
+  // Payment modal
+  // --------------------------------------------------------------------
+  var pmModal = document.getElementById("payment-modal");
+  var pmTotalEl = document.getElementById("pm-total");
+  var pmSplitToggle = document.getElementById("pm-split-toggle");
+  var pmSingle = document.getElementById("pm-single");
+  var pmSplit = document.getElementById("pm-split");
+  var pmMethodTabs = document.getElementById("pm-method-tabs");
+  var pmCashFields = document.getElementById("pm-cash-fields");
+  var pmTendered = document.getElementById("pm-tendered");
+  var pmChange = document.getElementById("pm-change");
+  var pmSplitRows = document.getElementById("pm-split-rows");
+  var pmAddRow = document.getElementById("pm-add-row");
+  var pmSplitAllocated = document.getElementById("pm-split-allocated");
+  var pmSplitRemaining = document.getElementById("pm-split-remaining");
+  var pmCustomerFields = document.getElementById("pm-customer-fields");
+  var pmCustomerSearch = document.getElementById("pm-customer-search");
+  var pmCustomerResults = document.getElementById("pm-customer-results");
+  var pmCustomerSelected = document.getElementById("pm-customer-selected");
+  var pmConfirm = document.getElementById("pm-confirm");
+
+  var pmSelectedMethod = null;
+  var pmSelectedCustomerId = null;
+  var pmSplitRowCount = 0;
+
+  if (!pmModal) return; // no payment methods enabled / view not present
+
+  function methodName(key) {
+    var m = paymentMethods.filter(function (x) { return x.key === key; })[0];
+    return m ? m.name : key;
+  }
+
+  function currentTotal() {
+    return totals().total;
+  }
+
+  function isSplitMode() {
+    return pmSplitToggle && pmSplitToggle.checked;
+  }
+
+  function splitRowEls() {
+    return Array.prototype.slice.call(pmSplitRows.querySelectorAll(".pos-split-row"));
+  }
+
+  function splitUsesUtang() {
+    return splitRowEls().some(function (row) {
+      return row.querySelector("select").value === "utang";
     });
   }
 
-  renderCart();
+  function addSplitRow() {
+    pmSplitRowCount += 1;
+    var row = document.createElement("div");
+    row.className = "pos-split-row";
+    var options = paymentMethods.map(function (m) {
+      return '<option value="' + m.key + '">' + m.name + '</option>';
+    }).join("");
+    row.innerHTML =
+      '<select class="form-control">' + options + '</select>' +
+      '<input type="number" step="0.01" min="0" class="form-control" placeholder="Amount">' +
+      '<button type="button" class="psr-remove">&times;</button>';
+    pmSplitRows.appendChild(row);
+
+    row.querySelector("select").addEventListener("change", recomputeSplit);
+    row.querySelector("input").addEventListener("input", recomputeSplit);
+    row.querySelector(".psr-remove").addEventListener("click", function () {
+      row.remove();
+      recomputeSplit();
+    });
+
+    recomputeSplit();
+  }
+
+  if (pmAddRow) pmAddRow.addEventListener("click", addSplitRow);
+
+  function recomputeSplit() {
+    var total = currentTotal();
+    var allocated = 0;
+    splitRowEls().forEach(function (row) {
+      allocated += parseFloat(row.querySelector("input").value) || 0;
+    });
+    allocated = Math.round(allocated * 100) / 100;
+    pmSplitAllocated.textContent = money(allocated);
+    pmSplitRemaining.textContent = money(Math.max(0, total - allocated));
+
+    pmCustomerFields.style.display = splitUsesUtang() ? "block" : "none";
+    updateConfirmState();
+  }
+
+  function resetCustomerPicker() {
+    pmSelectedCustomerId = null;
+    pmCustomerSearch.value = "";
+    pmCustomerResults.innerHTML = "";
+    pmCustomerSelected.innerHTML = "";
+  }
+
+  function renderCustomerResults(term) {
+    pmCustomerResults.innerHTML = "";
+    if (!term) return;
+    var t = term.toLowerCase();
+    var matches = customers.filter(function (c) {
+      return c.name.toLowerCase().indexOf(t) !== -1 || (c.contact_number && c.contact_number.indexOf(t) !== -1);
+    }).slice(0, 8);
+
+    matches.forEach(function (c) {
+      var row = document.createElement("div");
+      row.className = "pos-customer-result";
+      row.innerHTML = '<div>' + c.name + '</div>' + (c.contact_number ? '<div class="pcr-contact">' + c.contact_number + '</div>' : "");
+      row.addEventListener("click", function () {
+        pmSelectedCustomerId = c.id;
+        pmCustomerSearch.value = "";
+        pmCustomerResults.innerHTML = "";
+        pmCustomerSelected.innerHTML =
+          '<span class="pos-customer-selected-chip">Selected: ' + c.name + ' <button type="button" id="pm-customer-clear">&times;</button></span>';
+        document.getElementById("pm-customer-clear").addEventListener("click", function () {
+          resetCustomerPicker();
+          updateConfirmState();
+        });
+        updateConfirmState();
+      });
+      pmCustomerResults.appendChild(row);
+    });
+  }
+
+  if (pmCustomerSearch) {
+    pmCustomerSearch.addEventListener("input", function () {
+      pmSelectedCustomerId = null;
+      pmCustomerSelected.innerHTML = "";
+      renderCustomerResults(pmCustomerSearch.value.trim());
+      updateConfirmState();
+    });
+  }
+
+  if (pmMethodTabs) {
+    pmMethodTabs.addEventListener("click", function (e) {
+      var a = e.target.closest("a[data-method]");
+      if (!a) return;
+      e.preventDefault();
+      pmSelectedMethod = a.getAttribute("data-method");
+      pmMethodTabs.querySelectorAll("a").forEach(function (x) { x.classList.remove("is-active"); });
+      a.classList.add("is-active");
+      pmCashFields.style.display = pmSelectedMethod === "cash" ? "block" : "none";
+      pmCustomerFields.style.display = pmSelectedMethod === "utang" ? "block" : "none";
+      updateChange();
+      updateConfirmState();
+    });
+  }
+
+  function updateChange() {
+    if (!pmTendered) return;
+    var tendered = parseFloat(pmTendered.value) || 0;
+    pmChange.textContent = money(Math.max(0, tendered - currentTotal()));
+  }
+  if (pmTendered) pmTendered.addEventListener("input", function () { updateChange(); updateConfirmState(); });
+
+  if (pmSplitToggle) {
+    pmSplitToggle.addEventListener("change", function () {
+      if (isSplitMode()) {
+        pmSingle.style.display = "none";
+        pmSplit.style.display = "block";
+        if (splitRowEls().length === 0) {
+          addSplitRow();
+          addSplitRow();
+        }
+        recomputeSplit();
+      } else {
+        pmSplit.style.display = "none";
+        pmSingle.style.display = "block";
+        pmCustomerFields.style.display = pmSelectedMethod === "utang" ? "block" : "none";
+      }
+      updateConfirmState();
+    });
+  }
+
+  function updateConfirmState() {
+    var total = currentTotal();
+    var ok = false;
+
+    if (isSplitMode()) {
+      var rows = splitRowEls();
+      var allocated = 0;
+      var valid = rows.length > 0;
+      rows.forEach(function (row) {
+        var amt = parseFloat(row.querySelector("input").value) || 0;
+        if (amt <= 0) valid = false;
+        allocated += amt;
+      });
+      allocated = Math.round(allocated * 100) / 100;
+      ok = valid && Math.abs(allocated - total) < 0.01;
+      if (ok && splitUsesUtang() && !pmSelectedCustomerId) ok = false;
+    } else {
+      if (pmSelectedMethod) {
+        if (pmSelectedMethod === "cash") {
+          var tendered = parseFloat(pmTendered.value) || 0;
+          ok = tendered >= total;
+        } else {
+          ok = true;
+        }
+        if (ok && pmSelectedMethod === "utang" && !pmSelectedCustomerId) ok = false;
+      }
+    }
+
+    pmConfirm.disabled = !ok;
+  }
+
+  if (openPaymentBtn) {
+    openPaymentBtn.addEventListener("click", function () {
+      pmTotalEl.textContent = money(currentTotal());
+      pmSelectedMethod = null;
+      if (pmMethodTabs) pmMethodTabs.querySelectorAll("a").forEach(function (x) { x.classList.remove("is-active"); });
+      pmCashFields.style.display = "none";
+      if (pmTendered) pmTendered.value = "";
+      pmChange.textContent = money(0);
+      resetCustomerPicker();
+      pmCustomerFields.style.display = "none";
+      pmSplitRows.innerHTML = "";
+      pmSplitRowCount = 0;
+      if (pmSplitToggle) pmSplitToggle.checked = false;
+      pmSplit.style.display = "none";
+      pmSingle.style.display = "block";
+      updateConfirmState();
+    });
+  }
+
+  if (pmConfirm) {
+    pmConfirm.addEventListener("click", function () {
+      var payments = [];
+      var customerId = "";
+
+      if (isSplitMode()) {
+        splitRowEls().forEach(function (row) {
+          var method = row.querySelector("select").value;
+          var amount = parseFloat(row.querySelector("input").value) || 0;
+          payments.push({ method: method, amount: amount });
+        });
+        if (splitUsesUtang()) customerId = pmSelectedCustomerId || "";
+      } else {
+        var amount = pmSelectedMethod === "cash" ? (parseFloat(pmTendered.value) || 0) : currentTotal();
+        payments.push({ method: pmSelectedMethod, amount: amount });
+        if (pmSelectedMethod === "utang") customerId = pmSelectedCustomerId || "";
+      }
+
+      var t = totals();
+      document.getElementById("pos-cart-json").value = JSON.stringify(
+        Object.keys(cart).map(function (id) { return { id: id, qty: cart[id].qty }; })
+      );
+      document.getElementById("pos-payments-json").value = JSON.stringify(payments);
+      document.getElementById("pos-discount-hidden").value = t.discountPct;
+      document.getElementById("pos-customer-hidden").value = customerId;
+
+      document.getElementById("pos-form").submit();
+    });
+  }
 })();

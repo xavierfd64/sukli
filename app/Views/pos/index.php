@@ -2,9 +2,8 @@
 /** @var array $products */
 /** @var array $categories */
 /** @var array $customers */
-/** @var array $features */
-$gcashOn = !empty($features['gcash']['is_enabled']);
-$utangOn = !empty($features['utang']['is_enabled']);
+/** @var array $paymentMethods */
+/** @var bool $autoPrintReceipt */
 ?>
 <div class="pos-layout">
     <div class="pos-products">
@@ -15,7 +14,7 @@ $utangOn = !empty($features['utang']['is_enabled']);
             </div>
             <div class="input-icon-group mt-16">
                 <?= icon('barcode', 16) ?>
-                <input type="text" id="pos-barcode" class="form-control" placeholder="Scan or type barcode, then press Enter" autofocus>
+                <input type="text" id="pos-barcode" class="form-control" placeholder="Scan barcode (auto-detected) or press Enter" autofocus>
             </div>
         </div>
 
@@ -63,42 +62,75 @@ $utangOn = !empty($features['utang']['is_enabled']);
                 </div>
             </div>
 
-            <?php if ($utangOn && $customers): ?>
-            <div class="form-group mt-16" id="pos-customer-group" style="display:none;">
-                <label>Customer (required for Utang)</label>
-                <select id="pos-customer" class="form-control">
-                    <option value="">Select customer...</option>
-                    <?php foreach ($customers as $c): ?>
-                        <option value="<?= $c['id'] ?>"><?= e($c['name']) ?></option>
-                    <?php endforeach; ?>
-                </select>
-            </div>
-            <?php endif; ?>
-
-            <div class="form-group mt-16" id="pos-cash-group" style="display:none;">
-                <label>Cash Received</label>
-                <input type="number" step="0.01" min="0" id="pos-tendered" class="form-control">
-                <div class="form-hint">Change: <strong id="pos-change"><?= money(0) ?></strong></div>
-            </div>
-
-            <div class="grid grid-3 gap-8 mt-16">
-                <button type="button" class="btn pay-cash pay-btn" data-method="cash">Cash</button>
-                <?php if ($gcashOn): ?><button type="button" class="btn pay-gcash pay-btn" data-method="gcash">GCash</button><?php endif; ?>
-                <?php if ($utangOn): ?><button type="button" class="btn pay-utang pay-btn" data-method="utang">Utang</button><?php endif; ?>
-            </div>
+            <button type="button" class="btn btn-primary btn-block btn-lg mt-16" id="pos-open-payment" disabled data-modal-target="#payment-modal">Proceed to Payment</button>
 
             <form method="post" action="<?= url('/pos/checkout') ?>" id="pos-form">
                 <?= csrf_field() ?>
                 <input type="hidden" name="cart_json" id="pos-cart-json">
-                <input type="hidden" name="payment_method" id="pos-payment-method">
+                <input type="hidden" name="payments_json" id="pos-payments-json">
                 <input type="hidden" name="discount_percent" id="pos-discount-hidden">
-                <input type="hidden" name="amount_tendered" id="pos-tendered-hidden">
                 <input type="hidden" name="customer_id" id="pos-customer-hidden">
-                <button type="submit" class="btn btn-primary btn-block btn-lg mt-16" id="pos-submit" disabled>Pay &amp; Complete Sale</button>
             </form>
         </div>
     </div>
 </div>
 
-<script>window.SUKLI_CURRENCY = "₱";</script>
+<div class="modal-backdrop" id="payment-modal">
+    <div class="modal modal-lg">
+        <h3>Payment</h3>
+        <div class="flex items-center justify-between mb-16" style="font-size:18px;font-weight:700;">
+            <span>Total Due</span><span id="pm-total"><?= money(0) ?></span>
+        </div>
+
+        <?php if (count($paymentMethods) > 1): ?>
+        <label class="flex items-center gap-8 mb-16" style="font-size:13px;">
+            <input type="checkbox" id="pm-split-toggle"> Split Payment (pay with more than one method)
+        </label>
+        <?php endif; ?>
+
+        <div id="pm-single">
+            <div class="section-tabs" id="pm-method-tabs">
+                <?php foreach ($paymentMethods as $key => $m): ?>
+                    <a href="#" data-method="<?= e($key) ?>"><?= e($m['name']) ?></a>
+                <?php endforeach; ?>
+                <?php if (!$paymentMethods): ?><span class="text-muted">No payment methods are enabled. Enable one in Settings.</span><?php endif; ?>
+            </div>
+
+            <div class="form-group mt-16" id="pm-cash-fields" style="display:none;">
+                <label>Cash Received</label>
+                <input type="number" step="0.01" min="0" id="pm-tendered" class="form-control">
+                <div class="form-hint">Change: <strong id="pm-change"><?= money(0) ?></strong></div>
+            </div>
+        </div>
+
+        <div id="pm-split" style="display:none;">
+            <div id="pm-split-rows"></div>
+            <button type="button" class="btn btn-outline btn-sm" id="pm-add-row"><?= icon('plus', 14) ?> Add Payment Method</button>
+            <div class="flex items-center justify-between mt-16" style="font-size:13px;">
+                <span>Allocated</span><strong id="pm-split-allocated"><?= money(0) ?></strong>
+            </div>
+            <div class="flex items-center justify-between" style="font-size:13px;">
+                <span>Remaining</span><strong id="pm-split-remaining"><?= money(0) ?></strong>
+            </div>
+        </div>
+
+        <div class="form-group mt-16" id="pm-customer-fields" style="display:none;">
+            <label>Customer (required for Utang)</label>
+            <input type="text" id="pm-customer-search" class="form-control" placeholder="Search customer by name or contact number" autocomplete="off">
+            <div id="pm-customer-results" class="pos-customer-results"></div>
+            <div id="pm-customer-selected"></div>
+        </div>
+
+        <div class="flex gap-8 mt-16">
+            <button type="button" class="btn btn-outline btn-block" data-modal-close>Cancel</button>
+            <button type="button" class="btn btn-primary btn-block" id="pm-confirm" disabled>Complete Sale</button>
+        </div>
+    </div>
+</div>
+
+<script>
+window.SUKLI_CURRENCY = "₱";
+window.SUKLI_PAYMENT_METHODS = <?= json_encode(array_map(static fn ($k, $m) => ['key' => $k, 'name' => $m['name']], array_keys($paymentMethods), $paymentMethods)) ?>;
+window.SUKLI_CUSTOMERS = <?= json_encode($customers) ?>;
+</script>
 <script src="<?= asset('js/pos.js') ?>"></script>
