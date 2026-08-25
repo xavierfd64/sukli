@@ -590,9 +590,14 @@ class InstallController extends Controller
      */
     private function buildInstalledConfig(array $db): string
     {
+        // This 'url' is only a fallback for CLI contexts — real web requests
+        // compute scheme+host+subfolder live (see url() in helpers.php), so
+        // this value going stale (moved domain, subfolder, added HTTPS)
+        // doesn't break anything. Still computed correctly here, including
+        // the subfolder Sukli was installed under, for that fallback's sake.
         $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
         $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
-        $appUrl = $scheme . '://' . $host;
+        $appUrl = $scheme . '://' . $host . Request::basePath();
 
         $config = [
             'db' => [

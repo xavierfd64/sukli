@@ -5,6 +5,7 @@ declare(strict_types=1);
 use Sukli\Core\Auth;
 use Sukli\Core\Csrf;
 use Sukli\Core\Icons;
+use Sukli\Core\Request;
 use Sukli\Core\Session;
 use Sukli\Core\View;
 use Sukli\Services\PermissionService;
@@ -28,9 +29,25 @@ function config_value(string $key, mixed $default = null): mixed
     return $config[$key] ?? $default;
 }
 
+/**
+ * Builds an absolute URL for the given app-relative path. Scheme, host and
+ * subfolder are computed from the current request (see
+ * Request::basePath()) rather than trusting a value saved once at install
+ * time — this is what makes uploaded-file URLs, asset links, and redirects
+ * keep working correctly if the site is later moved to a different
+ * domain/subfolder or switched from http to https, with nothing to
+ * reconfigure. Falls back to the stored config value only when there is no
+ * HTTP request to read from (CLI scripts).
+ */
 function url(string $path = '/'): string
 {
-    $base = rtrim((string) config_value('url', ''), '/');
+    if (!empty($_SERVER['HTTP_HOST'])) {
+        $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+        $base = $scheme . '://' . $_SERVER['HTTP_HOST'] . Request::basePath();
+    } else {
+        $base = rtrim((string) config_value('url', ''), '/');
+    }
+
     if ($path === '' || $path === '/') {
         return $base . '/';
     }

@@ -83,7 +83,7 @@ function stock_badge(array $p): string
             <?php foreach ($products as $p): ?>
                 <tr>
                     <td>
-                        <?php if (!empty($p['image_path'])): ?>
+                        <?php if (\Sukli\Services\UploadService::exists($p['image_path'] ?? null)): ?>
                             <img src="<?= e(\Sukli\Services\UploadService::url($p['image_path'])) ?>" alt="" class="product-thumb">
                         <?php else: ?>
                             <div class="product-thumb product-thumb-placeholder">NO<br>IMAGE</div>

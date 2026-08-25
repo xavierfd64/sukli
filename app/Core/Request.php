@@ -23,10 +23,38 @@ class Request
         return strtoupper($this->server['REQUEST_METHOD'] ?? 'GET');
     }
 
+    /**
+     * The subfolder Sukli is installed under, e.g. "/sukli" when reached at
+     * https://example.com/sukli/, or "" at a domain/subdomain root. Derived
+     * from SCRIPT_NAME (where index.php actually lives) rather than stored
+     * anywhere, so it self-corrects if the install is ever moved — the same
+     * value both route matching (path()) and outgoing URLs (url() in
+     * helpers.php) rely on to stay in sync automatically.
+     */
+    public static function basePath(): string
+    {
+        static $base = null;
+        if ($base !== null) {
+            return $base;
+        }
+        $script = $_SERVER['SCRIPT_NAME'] ?? '';
+        $dir = str_replace('\\', '/', dirname($script));
+        return $base = ($dir === '/' || $dir === '.' || $dir === '') ? '' : rtrim($dir, '/');
+    }
+
     public function path(): string
     {
         $uri = $this->server['REQUEST_URI'] ?? '/';
         $path = parse_url($uri, PHP_URL_PATH) ?: '/';
+
+        $base = self::basePath();
+        if ($base !== '' && str_starts_with($path, $base)) {
+            $path = substr($path, strlen($base));
+            if ($path === '' || $path[0] !== '/') {
+                $path = '/' . $path;
+            }
+        }
+
         return rtrim($path, '/') === '' ? '/' : rtrim($path, '/');
     }
 

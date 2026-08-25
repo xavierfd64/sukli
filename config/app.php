@@ -3,15 +3,19 @@
 declare(strict_types=1);
 
 use Sukli\Core\Env;
+use Sukli\Core\Request;
 
-// Before install (i.e. before config/installed.php exists), fall back to
-// the current request's own scheme+host instead of a hardcoded "localhost"
-// so installer-generated links/assets work on whatever domain the site is
-// actually reached at. Once installed, the saved APP_URL always wins.
+// This 'url' value is only a fallback for contexts with no HTTP request to
+// read from (CLI scripts like database/migrate.php) — every real web
+// request instead has the url() helper (app/Core/helpers.php) compute
+// scheme+host+subfolder live from that request, so it can't go stale if
+// the install is later moved to a different domain or gets HTTPS. Still
+// include the current request's scheme/host/subfolder here when one is
+// available, so this fallback is accurate too, not just "http://localhost".
 $fallbackUrl = 'http://localhost';
 if (!empty($_SERVER['HTTP_HOST'])) {
     $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
-    $fallbackUrl = $scheme . '://' . $_SERVER['HTTP_HOST'];
+    $fallbackUrl = $scheme . '://' . $_SERVER['HTTP_HOST'] . Request::basePath();
 }
 
 // Installer-written config (config/installed.php) always wins once it

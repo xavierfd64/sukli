@@ -45,11 +45,27 @@ class UploadService
         }
 
         $filename = bin2hex(random_bytes(16)) . '.' . self::ALLOWED_MIME[$mime];
-        if (!move_uploaded_file($file['tmp_name'], $dir . '/' . $filename)) {
+        $destination = $dir . '/' . $filename;
+        if (!move_uploaded_file($file['tmp_name'], $destination)) {
             throw new \RuntimeException('Failed to save the uploaded file.');
+        }
+        // Shared hosting sometimes leaves moved files at a stricter mode
+        // than the web server's user can read (e.g. 600) depending on the
+        // PHP execution mode (suPHP/PHP-FPM) — force a world-readable mode
+        // so the file is actually servable, without making it writable.
+        @chmod($destination, 0644);
+
+        if (!is_readable($destination)) {
+            throw new \RuntimeException('The file was saved but is not readable — check storage/uploads permissions.');
         }
 
         return $subdir . '/' . $filename;
+    }
+
+    /** True if the given relative path both is set and actually exists on disk — lets views fall back to a placeholder instead of a broken image when a DB path has gone stale. */
+    public static function exists(?string $relativePath): bool
+    {
+        return $relativePath !== null && $relativePath !== '' && is_file(self::baseDir() . '/' . $relativePath);
     }
 
     public static function delete(?string $relativePath): void

@@ -10,7 +10,7 @@ $isEdit = $product !== null;
         <div class="form-group">
             <label>Product Image</label>
             <div class="flex items-center gap-16">
-                <?php if (!empty($product['image_path'])): ?>
+                <?php if (\Sukli\Services\UploadService::exists($product['image_path'] ?? null)): ?>
                     <img src="<?= e(\Sukli\Services\UploadService::url($product['image_path'])) ?>" alt="" class="product-thumb product-thumb-lg">
                 <?php else: ?>
                     <div class="product-thumb product-thumb-lg product-thumb-placeholder">NO IMAGE</div>

@@ -39,7 +39,7 @@ $canManage = $canEdit || $canDelete;
                     <td><span class="badge badge-amber"><?= e($r['category']) ?></span></td>
                     <td><?= money($r['amount']) ?></td>
                     <td class="text-muted"><?= e($r['description'] ?? '—') ?></td>
-                    <td><?php if (!empty($r['receipt_attachment_path'])): ?><a href="<?= e(\Sukli\Services\UploadService::url($r['receipt_attachment_path'])) ?>" target="_blank" class="text-muted"><?= icon('paperclip', 14) ?> View</a><?php else: ?><span class="text-muted">—</span><?php endif; ?></td>
+                    <td><?php if (\Sukli\Services\UploadService::exists($r['receipt_attachment_path'] ?? null)): ?><a href="<?= e(\Sukli\Services\UploadService::url($r['receipt_attachment_path'])) ?>" target="_blank" class="text-muted"><?= icon('paperclip', 14) ?> View</a><?php else: ?><span class="text-muted">—</span><?php endif; ?></td>
                     <td class="text-muted"><?= e($r['created_by_name'] ?? '—') ?></td>
                     <?php if ($canManage): ?>
                     <td>
@@ -105,7 +105,7 @@ $canManage = $canEdit || $canDelete;
             <div class="form-group"><label>Description</label><input class="form-control" name="description" value="<?= e($r['description'] ?? '') ?>"></div>
             <div class="form-group">
                 <label>Receipt Attachment</label>
-                <?php if (!empty($r['receipt_attachment_path'])): ?>
+                <?php if (\Sukli\Services\UploadService::exists($r['receipt_attachment_path'] ?? null)): ?>
                     <div class="form-hint mb-8"><a href="<?= e(\Sukli\Services\UploadService::url($r['receipt_attachment_path'])) ?>" target="_blank">View current attachment</a> — choose a file below to replace it.</div>
                 <?php endif; ?>
                 <input class="form-control" type="file" name="receipt" accept="image/jpeg,image/png,image/webp,application/pdf">

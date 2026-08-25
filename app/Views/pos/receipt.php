@@ -24,7 +24,7 @@ $methodLabels = [
 
 <div class="card" style="max-width:420px;" id="receipt-print">
     <div style="text-align:center;margin-bottom:14px;">
-        <?php if ($receiptShowLogo && !empty($store['logo_path'])): ?>
+        <?php if ($receiptShowLogo && \Sukli\Services\UploadService::exists($store['logo_path'] ?? null)): ?>
             <img src="<?= e(\Sukli\Services\UploadService::url($store['logo_path'])) ?>" alt="" style="width:44px;height:44px;object-fit:cover;border-radius:8px;margin-bottom:6px;">
         <?php endif; ?>
         <div><strong style="font-size:16px;"><?= e($receiptHeader ?: ($store['name'] ?? 'Sukli Store')) ?></strong></div>

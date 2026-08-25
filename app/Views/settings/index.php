@@ -73,7 +73,8 @@
             <div class="form-group">
                 <label>Business Logo</label>
                 <div class="flex items-center gap-16">
-                    <?php if (!empty($store['logo_path'])): ?>
+                    <?php $hasLogo = \Sukli\Services\UploadService::exists($store['logo_path'] ?? null); ?>
+                    <?php if ($hasLogo): ?>
                         <img src="<?= e(\Sukli\Services\UploadService::url($store['logo_path'])) ?>" alt="" class="product-thumb product-thumb-lg">
                     <?php else: ?>
                         <div class="product-thumb product-thumb-lg product-thumb-placeholder">NO LOGO</div>
@@ -137,9 +138,9 @@
                 <div class="text-muted" style="font-size:11px;font-weight:700;text-transform:uppercase;margin-bottom:8px;">Live Preview</div>
                 <div class="card" style="max-width:280px;background:#fafafa;">
                     <div style="text-align:center;margin-bottom:12px;">
-                        <img src="<?= !empty($store['logo_path']) ? e(\Sukli\Services\UploadService::url($store['logo_path'])) : '' ?>" alt=""
-                             id="rc-preview-logo" data-has-logo="<?= !empty($store['logo_path']) ? '1' : '0' ?>"
-                             style="width:40px;height:40px;object-fit:cover;border-radius:8px;margin-bottom:6px;<?= ($receiptShowLogo && !empty($store['logo_path'])) ? '' : 'display:none;' ?>">
+                        <img src="<?= $hasLogo ? e(\Sukli\Services\UploadService::url($store['logo_path'])) : '' ?>" alt=""
+                             id="rc-preview-logo" data-has-logo="<?= $hasLogo ? '1' : '0' ?>"
+                             style="width:40px;height:40px;object-fit:cover;border-radius:8px;margin-bottom:6px;<?= ($receiptShowLogo && $hasLogo) ? '' : 'display:none;' ?>">
                         <div id="rc-preview-header" style="font-weight:700;font-size:14px;"><?= e($receiptHeader ?: $store['name']) ?></div>
                         <div id="rc-preview-address" style="font-size:11px;color:var(--text-muted);<?= $receiptShowAddress ? '' : 'display:none;' ?>"><?= e($store['address'] ?? '') ?></div>
                         <div id="rc-preview-phone" style="font-size:11px;color:var(--text-muted);<?= $receiptShowPhone ? '' : 'display:none;' ?>"><?= e($store['phone'] ?? '') ?></div>
