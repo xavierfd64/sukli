@@ -10,6 +10,7 @@ use Sukli\Core\Database;
 use Sukli\Core\Request;
 use Sukli\Core\Session;
 use Sukli\Services\AuditService;
+use Sukli\Services\EloadProductService;
 use Sukli\Services\ExpenseCategoryService;
 use Sukli\Services\FeatureService;
 use Sukli\Services\GcashChargeBracketService;
@@ -177,6 +178,67 @@ class SettingsController extends Controller
         AuditService::log('update', 'settings', 'network', $id);
         Session::flash('success', 'Network updated.');
         $this->back('/settings/networks');
+    }
+
+    public function eloadProducts(Request $request): void
+    {
+        $storeId = (int) Auth::storeId();
+        $this->view('settings/eload-products', [
+            'pageTitle' => 'E-Load Products',
+            'products' => EloadProductService::all($storeId),
+            'networks' => NetworkService::all($storeId),
+        ]);
+    }
+
+    public function storeEloadProduct(Request $request): void
+    {
+        $storeId = (int) Auth::storeId();
+        $network = $request->trimmed('network');
+        $name = $request->trimmed('name');
+        $cost = (float) $request->input('cost', 0);
+        $additionalCharge = (float) $request->input('additional_charge', 0);
+        $sellingPrice = (float) $request->input('selling_price', 0);
+
+        if (!$network || !$name || $cost < 0 || $additionalCharge < 0 || $sellingPrice < 0) {
+            Session::flash('error', 'Enter a network, product name, and valid non-negative amounts.');
+            $this->back('/settings/eload-products');
+        }
+
+        EloadProductService::create($storeId, $network, $name, $cost, $additionalCharge, $sellingPrice);
+        AuditService::log('create', 'settings', 'eload_product', 0, null, ['network' => $network, 'name' => $name, 'cost' => $cost, 'selling_price' => $sellingPrice]);
+        Session::flash('success', 'E-Load product added.');
+        $this->back('/settings/eload-products');
+    }
+
+    public function updateEloadProduct(Request $request): void
+    {
+        $storeId = (int) Auth::storeId();
+        $id = (int) $request->param('id');
+        $network = $request->trimmed('network');
+        $name = $request->trimmed('name');
+        $cost = (float) $request->input('cost', 0);
+        $additionalCharge = (float) $request->input('additional_charge', 0);
+        $sellingPrice = (float) $request->input('selling_price', 0);
+
+        if (!$network || !$name || $cost < 0 || $additionalCharge < 0 || $sellingPrice < 0) {
+            Session::flash('error', 'Enter a network, product name, and valid non-negative amounts.');
+            $this->back('/settings/eload-products');
+        }
+
+        EloadProductService::update($storeId, $id, $network, $name, $cost, $additionalCharge, $sellingPrice);
+        AuditService::log('update', 'settings', 'eload_product', $id, null, ['network' => $network, 'name' => $name, 'cost' => $cost, 'selling_price' => $sellingPrice]);
+        Session::flash('success', 'E-Load product updated.');
+        $this->back('/settings/eload-products');
+    }
+
+    public function toggleEloadProduct(Request $request): void
+    {
+        $storeId = (int) Auth::storeId();
+        $id = (int) $request->param('id');
+        EloadProductService::toggle($storeId, $id);
+        AuditService::log('update', 'settings', 'eload_product', $id, null, ['toggled_active' => true]);
+        Session::flash('success', 'E-Load product updated.');
+        $this->back('/settings/eload-products');
     }
 
     public function gcashBrackets(Request $request): void

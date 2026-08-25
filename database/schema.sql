@@ -404,6 +404,26 @@ CREATE TABLE IF NOT EXISTS networks (
     CONSTRAINT fk_networks_store FOREIGN KEY (store_id) REFERENCES stores(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- E-Load product catalog, per network. selling_price is always a value the
+-- admin sets explicitly (never derived from cost + additional_charge) —
+-- additional_charge is only a hint used to compute a *suggested* price in
+-- the UI. earnings (selling_price - cost) is computed on read, not stored,
+-- so it can never drift from the two values it's derived from.
+CREATE TABLE IF NOT EXISTS eload_products (
+    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    store_id INT UNSIGNED NOT NULL,
+    network VARCHAR(50) NOT NULL,
+    name VARCHAR(100) NOT NULL,
+    cost DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+    additional_charge DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+    selling_price DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+    is_active TINYINT(1) NOT NULL DEFAULT 1,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    KEY idx_eload_products_store (store_id, network),
+    CONSTRAINT fk_eload_products_store FOREIGN KEY (store_id) REFERENCES stores(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 -- max_amount NULL = no upper bound (open-ended top bracket).
 CREATE TABLE IF NOT EXISTS gcash_charge_brackets (
     id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,

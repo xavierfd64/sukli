@@ -143,6 +143,10 @@ $router->post('/settings/payment-methods', [SettingsController::class, 'updatePa
 $router->get('/settings/networks', [SettingsController::class, 'networks'], [$auth, $perm('settings', 'manage')]);
 $router->post('/settings/networks', [SettingsController::class, 'storeNetwork'], [$auth, $perm('settings', 'manage'), $csrf]);
 $router->post('/settings/networks/{id}/toggle', [SettingsController::class, 'toggleNetwork'], [$auth, $perm('settings', 'manage'), $csrf]);
+$router->get('/settings/eload-products', [SettingsController::class, 'eloadProducts'], [$auth, $perm('settings', 'manage')]);
+$router->post('/settings/eload-products', [SettingsController::class, 'storeEloadProduct'], [$auth, $perm('settings', 'manage'), $csrf]);
+$router->post('/settings/eload-products/{id}', [SettingsController::class, 'updateEloadProduct'], [$auth, $perm('settings', 'manage'), $csrf]);
+$router->post('/settings/eload-products/{id}/toggle', [SettingsController::class, 'toggleEloadProduct'], [$auth, $perm('settings', 'manage'), $csrf]);
 $router->get('/settings/gcash-brackets', [SettingsController::class, 'gcashBrackets'], [$auth, $perm('settings', 'manage')]);
 $router->post('/settings/gcash-brackets', [SettingsController::class, 'storeGcashBracket'], [$auth, $perm('settings', 'manage'), $csrf]);
 $router->post('/settings/gcash-brackets/{id}/delete', [SettingsController::class, 'deleteGcashBracket'], [$auth, $perm('settings', 'manage'), $csrf]);
