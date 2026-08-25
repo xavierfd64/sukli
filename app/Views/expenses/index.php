@@ -30,7 +30,7 @@ $canManage = in_array($role, ['owner', 'manager'], true);
 <div class="card">
     <div class="table-wrap">
         <table class="table">
-            <thead><tr><th>Date</th><th>Category</th><th>Amount</th><th>Description</th><th>Recorded By</th><?php if ($canManage): ?><th>Actions</th><?php endif; ?></tr></thead>
+            <thead><tr><th>Date</th><th>Category</th><th>Amount</th><th>Description</th><th>Receipt</th><th>Recorded By</th><?php if ($canManage): ?><th>Actions</th><?php endif; ?></tr></thead>
             <tbody>
             <?php foreach ($records as $r): ?>
                 <tr>
@@ -38,6 +38,7 @@ $canManage = in_array($role, ['owner', 'manager'], true);
                     <td><span class="badge badge-amber"><?= e($r['category']) ?></span></td>
                     <td><?= money($r['amount']) ?></td>
                     <td class="text-muted"><?= e($r['description'] ?? '—') ?></td>
+                    <td><?php if (!empty($r['receipt_attachment_path'])): ?><a href="<?= e(\Sukli\Services\UploadService::url($r['receipt_attachment_path'])) ?>" target="_blank" class="text-muted"><?= icon('paperclip', 14) ?> View</a><?php else: ?><span class="text-muted">—</span><?php endif; ?></td>
                     <td class="text-muted"><?= e($r['created_by_name'] ?? '—') ?></td>
                     <?php if ($canManage): ?>
                     <td>
@@ -52,7 +53,7 @@ $canManage = in_array($role, ['owner', 'manager'], true);
                     <?php endif; ?>
                 </tr>
             <?php endforeach; ?>
-            <?php if (!$records): ?><tr><td colspan="6" class="text-muted">No expense records for this period.</td></tr><?php endif; ?>
+            <?php if (!$records): ?><tr><td colspan="7" class="text-muted">No expense records for this period.</td></tr><?php endif; ?>
             </tbody>
         </table>
     </div>
@@ -61,7 +62,7 @@ $canManage = in_array($role, ['owner', 'manager'], true);
 <div class="modal-backdrop" id="add-expense">
     <div class="modal">
         <h3>Add Expense</h3>
-        <form method="post" action="<?= url('/expenses') ?>">
+        <form method="post" action="<?= url('/expenses') ?>" enctype="multipart/form-data">
             <?= csrf_field() ?>
             <div class="form-row">
                 <div class="form-group"><label>Date</label><input class="form-control" type="date" name="expense_date" value="<?= date('Y-m-d') ?>" required></div>
@@ -74,6 +75,7 @@ $canManage = in_array($role, ['owner', 'manager'], true);
                 </select>
             </div>
             <div class="form-group"><label>Description</label><input class="form-control" name="description" placeholder="Optional notes"></div>
+            <div class="form-group"><label>Receipt Attachment</label><input class="form-control" type="file" name="receipt" accept="image/jpeg,image/png,image/webp,application/pdf"><div class="form-hint">JPG, PNG, WEBP or PDF — max 5MB.</div></div>
             <div class="flex gap-8"><button type="button" class="btn btn-outline btn-block" data-modal-close>Cancel</button><button class="btn btn-primary btn-block">Save</button></div>
         </form>
     </div>
@@ -83,7 +85,7 @@ $canManage = in_array($role, ['owner', 'manager'], true);
 <div class="modal-backdrop" id="edit-expense-<?= $r['id'] ?>">
     <div class="modal">
         <h3>Edit Expense</h3>
-        <form method="post" action="<?= url('/expenses/' . $r['id']) ?>">
+        <form method="post" action="<?= url('/expenses/' . $r['id']) ?>" enctype="multipart/form-data">
             <?= csrf_field() ?>
             <div class="form-row">
                 <div class="form-group"><label>Date</label><input class="form-control" type="date" name="expense_date" value="<?= e($r['expense_date']) ?>" required></div>
@@ -96,6 +98,13 @@ $canManage = in_array($role, ['owner', 'manager'], true);
                 </select>
             </div>
             <div class="form-group"><label>Description</label><input class="form-control" name="description" value="<?= e($r['description'] ?? '') ?>"></div>
+            <div class="form-group">
+                <label>Receipt Attachment</label>
+                <?php if (!empty($r['receipt_attachment_path'])): ?>
+                    <div class="form-hint mb-8"><a href="<?= e(\Sukli\Services\UploadService::url($r['receipt_attachment_path'])) ?>" target="_blank">View current attachment</a> — choose a file below to replace it.</div>
+                <?php endif; ?>
+                <input class="form-control" type="file" name="receipt" accept="image/jpeg,image/png,image/webp,application/pdf">
+            </div>
             <div class="flex gap-8"><button type="button" class="btn btn-outline btn-block" data-modal-close>Cancel</button><button class="btn btn-primary btn-block">Save</button></div>
         </form>
     </div>

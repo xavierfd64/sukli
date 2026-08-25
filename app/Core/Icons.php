@@ -41,6 +41,7 @@ class Icons
         'chevron-right' => 'm9 18 6-6-6-6',
         'x' => 'M18 6 6 18M6 6l12 12',
         'check' => 'M20 6 9 17l-5-5',
+        'paperclip' => 'M21.44 11.05 12.25 20.24a6 6 0 0 1-8.49-8.49l8.57-8.57a4 4 0 0 1 5.66 5.66l-8.58 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48',
     ];
 
     public static function svg(string $name, int $size = 18): string

@@ -10,11 +10,11 @@ use Sukli\Core\Database;
 use Sukli\Core\Request;
 use Sukli\Core\Session;
 use Sukli\Services\AuditService;
+use Sukli\Services\ExpenseCategoryService;
+use Sukli\Services\UploadService;
 
 class ExpenseController extends Controller
 {
-    private const CATEGORIES = ['Restock / Supplies', 'Utilities', 'Rent', 'Transportation', 'Salary', 'Other'];
-
     public function index(Request $request): void
     {
         $storeId = Auth::storeId();
@@ -37,7 +37,7 @@ class ExpenseController extends Controller
             'total' => $total,
             'from' => $from,
             'to' => $to,
-            'categories' => self::CATEGORIES,
+            'categories' => ExpenseCategoryService::names((int) $storeId),
         ]);
     }
 
@@ -53,9 +53,16 @@ class ExpenseController extends Controller
             $this->back('/expenses');
         }
 
+        try {
+            $receiptPath = UploadService::store($request->file('receipt'), 'receipts/' . $storeId);
+        } catch (\RuntimeException $e) {
+            Session::flash('error', $e->getMessage());
+            $this->back('/expenses');
+        }
+
         Database::execute(
-            "INSERT INTO expense_records (store_id, expense_date, category, amount, description, created_by) VALUES (?, ?, ?, ?, ?, ?)",
-            [$storeId, $date, $category, $amount, $request->trimmed('description') ?: null, Auth::id()]
+            "INSERT INTO expense_records (store_id, expense_date, category, amount, description, receipt_attachment_path, created_by) VALUES (?, ?, ?, ?, ?, ?, ?)",
+            [$storeId, $date, $category, $amount, $request->trimmed('description') ?: null, $receiptPath, Auth::id()]
         );
         $id = (int) Database::lastInsertId();
 
@@ -68,16 +75,28 @@ class ExpenseController extends Controller
     {
         $id = (int) $request->param('id');
         $storeId = Auth::storeId();
-        $existing = Database::one("SELECT id FROM expense_records WHERE id = ? AND store_id = ?", [$id, $storeId]);
+        $existing = Database::one("SELECT id, receipt_attachment_path FROM expense_records WHERE id = ? AND store_id = ?", [$id, $storeId]);
         if (!$existing) {
             Session::flash('error', 'Record not found.');
             $this->back('/expenses');
         }
 
+        $receiptPath = $existing['receipt_attachment_path'];
+        try {
+            $uploaded = UploadService::store($request->file('receipt'), 'receipts/' . $storeId);
+            if ($uploaded) {
+                UploadService::delete($receiptPath);
+                $receiptPath = $uploaded;
+            }
+        } catch (\RuntimeException $e) {
+            Session::flash('error', $e->getMessage());
+            $this->back('/expenses');
+        }
+
         Database::execute(
-            "UPDATE expense_records SET expense_date=?, category=?, amount=?, description=?, updated_at=NOW() WHERE id = ? AND store_id = ?",
+            "UPDATE expense_records SET expense_date=?, category=?, amount=?, description=?, receipt_attachment_path=?, updated_at=NOW() WHERE id = ? AND store_id = ?",
             [$request->trimmed('expense_date'), $request->trimmed('category'), (float) $request->input('amount', 0),
-             $request->trimmed('description') ?: null, $id, $storeId]
+             $request->trimmed('description') ?: null, $receiptPath, $id, $storeId]
         );
 
         AuditService::log('update', 'expenses', 'expense_record', $id);
@@ -89,7 +108,11 @@ class ExpenseController extends Controller
     {
         $id = (int) $request->param('id');
         $storeId = Auth::storeId();
+        $existing = Database::one("SELECT receipt_attachment_path FROM expense_records WHERE id = ? AND store_id = ?", [$id, $storeId]);
         Database::execute("DELETE FROM expense_records WHERE id = ? AND store_id = ?", [$id, $storeId]);
+        if ($existing) {
+            UploadService::delete($existing['receipt_attachment_path']);
+        }
         AuditService::log('delete', 'expenses', 'expense_record', $id);
         Session::flash('success', 'Expense record deleted.');
         $this->back('/expenses');

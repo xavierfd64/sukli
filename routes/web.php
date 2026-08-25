@@ -134,6 +134,9 @@ $router->post('/settings/networks/{id}/toggle', [SettingsController::class, 'tog
 $router->get('/settings/gcash-brackets', [SettingsController::class, 'gcashBrackets'], [$auth, $ownerOnly]);
 $router->post('/settings/gcash-brackets', [SettingsController::class, 'storeGcashBracket'], [$auth, $ownerOnly, $csrf]);
 $router->post('/settings/gcash-brackets/{id}/delete', [SettingsController::class, 'deleteGcashBracket'], [$auth, $ownerOnly, $csrf]);
+$router->get('/settings/expense-categories', [SettingsController::class, 'expenseCategories'], [$auth, $ownerOnly]);
+$router->post('/settings/expense-categories', [SettingsController::class, 'storeExpenseCategory'], [$auth, $ownerOnly, $csrf]);
+$router->post('/settings/expense-categories/{id}/delete', [SettingsController::class, 'deleteExpenseCategory'], [$auth, $ownerOnly, $csrf]);
 $router->post('/settings/security', [SettingsController::class, 'updateSecurity'], [$auth, $ownerOnly, $csrf]);
 $router->get('/settings/backup', [SettingsController::class, 'downloadBackup'], [$auth, $ownerOnly]);
 

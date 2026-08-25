@@ -52,6 +52,16 @@
     </div>
 
     <div class="card mb-16">
+        <div class="flex items-center justify-between" style="flex-wrap:wrap;gap:10px;">
+            <div>
+                <div class="card-title" style="margin:0;">Expense Categories</div>
+                <div class="text-muted" style="font-size:12.5px;">Manage the category list used on the Expenses form.</div>
+            </div>
+            <a href="<?= url('/settings/expense-categories') ?>" class="btn btn-outline">Manage Categories <?= icon('chevron-right', 14) ?></a>
+        </div>
+    </div>
+
+    <div class="card mb-16">
         <div class="card-title">General Settings</div>
         <div class="card-subtitle">Store information, business preferences, receipt footer</div>
         <form method="post" action="<?= url('/settings/general') ?>">

@@ -3,6 +3,8 @@
 /storage/installed.lock
 /storage/logs/*.log
 /storage/cache/*
+/storage/uploads/*
+!/storage/uploads/.gitkeep
 .DS_Store
 Thumbs.db
 *.swp

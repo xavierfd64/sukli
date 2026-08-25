@@ -10,6 +10,7 @@ use Sukli\Core\Database;
 use Sukli\Core\Request;
 use Sukli\Core\Session;
 use Sukli\Services\AuditService;
+use Sukli\Services\ExpenseCategoryService;
 use Sukli\Services\FeatureService;
 use Sukli\Services\GcashChargeBracketService;
 use Sukli\Services\NetworkService;
@@ -174,6 +175,44 @@ class SettingsController extends Controller
         AuditService::log('delete', 'settings', 'gcash_charge_bracket', $id);
         Session::flash('success', 'Charge bracket removed.');
         $this->back('/settings/gcash-brackets');
+    }
+
+    public function expenseCategories(Request $request): void
+    {
+        $storeId = (int) Auth::storeId();
+        $this->view('settings/expense-categories', [
+            'pageTitle' => 'Expense Categories',
+            'categories' => ExpenseCategoryService::all($storeId),
+        ]);
+    }
+
+    public function storeExpenseCategory(Request $request): void
+    {
+        $storeId = (int) Auth::storeId();
+        $name = $request->trimmed('name');
+        if (!$name) {
+            Session::flash('error', 'Enter a category name.');
+            $this->back('/settings/expense-categories');
+        }
+
+        try {
+            ExpenseCategoryService::create($storeId, $name);
+            AuditService::log('create', 'settings', 'expense_category', 0, null, ['name' => $name]);
+            Session::flash('success', 'Category added.');
+        } catch (\Throwable $e) {
+            Session::flash('error', 'That category already exists.');
+        }
+        $this->back('/settings/expense-categories');
+    }
+
+    public function deleteExpenseCategory(Request $request): void
+    {
+        $storeId = (int) Auth::storeId();
+        $id = (int) $request->param('id');
+        ExpenseCategoryService::delete($storeId, $id);
+        AuditService::log('delete', 'settings', 'expense_category', $id);
+        Session::flash('success', 'Category removed.');
+        $this->back('/settings/expense-categories');
     }
 
     public function features(Request $request): void
