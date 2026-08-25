@@ -10,7 +10,9 @@ use Sukli\Core\Database;
 use Sukli\Core\Request;
 use Sukli\Core\Session;
 use Sukli\Services\AuditService;
+use Sukli\Services\BarcodeService;
 use Sukli\Services\StockService;
+use Sukli\Services\UploadService;
 
 class InventoryController extends Controller
 {
@@ -103,12 +105,23 @@ class InventoryController extends Controller
         $data = $this->validated($request);
         $storeId = Auth::storeId();
 
+        if (!$data['barcode']) {
+            $data['barcode'] = BarcodeService::generate((int) $storeId);
+        }
+
+        try {
+            $imagePath = UploadService::store($request->file('image'), 'products/' . $storeId);
+        } catch (\RuntimeException $e) {
+            Session::flash('error', $e->getMessage());
+            $this->redirect('/inventory/create');
+        }
+
         Database::beginTransaction();
         try {
             Database::execute(
-                "INSERT INTO products (store_id, category_id, name, barcode, unit, cost_price, selling_price, current_stock, min_stock, expiry_date, status)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, ?, 'active')",
-                [$storeId, $data['category_id'], $data['name'], $data['barcode'], $data['unit'],
+                "INSERT INTO products (store_id, category_id, name, barcode, image_path, unit, cost_price, selling_price, current_stock, min_stock, expiry_date, status)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, 'active')",
+                [$storeId, $data['category_id'], $data['name'], $data['barcode'], $imagePath, $data['unit'],
                  $data['cost_price'], $data['selling_price'], $data['min_stock'], $data['expiry_date']]
             );
             $productId = (int) Database::lastInsertId();
@@ -156,17 +169,57 @@ class InventoryController extends Controller
         }
 
         $data = $this->validated($request);
+        if (!$data['barcode']) {
+            $data['barcode'] = $existing['barcode'] ?: BarcodeService::generate((int) $storeId);
+        }
+
+        $imagePath = $existing['image_path'];
+        try {
+            $uploaded = UploadService::store($request->file('image'), 'products/' . $storeId);
+            if ($uploaded) {
+                UploadService::delete($imagePath);
+                $imagePath = $uploaded;
+            }
+        } catch (\RuntimeException $e) {
+            Session::flash('error', $e->getMessage());
+            $this->redirect('/inventory/' . $id . '/edit');
+        }
 
         Database::execute(
-            "UPDATE products SET category_id=?, name=?, barcode=?, unit=?, cost_price=?, selling_price=?, min_stock=?, expiry_date=?, updated_at=NOW()
+            "UPDATE products SET category_id=?, name=?, barcode=?, image_path=?, unit=?, cost_price=?, selling_price=?, min_stock=?, expiry_date=?, updated_at=NOW()
              WHERE id = ? AND store_id = ?",
-            [$data['category_id'], $data['name'], $data['barcode'], $data['unit'], $data['cost_price'],
+            [$data['category_id'], $data['name'], $data['barcode'], $imagePath, $data['unit'], $data['cost_price'],
              $data['selling_price'], $data['min_stock'], $data['expiry_date'], $id, $storeId]
         );
 
         AuditService::log('update', 'inventory', 'product', $id, $existing, $data);
         Session::flash('success', 'Product updated.');
         $this->redirect('/inventory');
+    }
+
+    public function labels(Request $request): void
+    {
+        $storeId = Auth::storeId();
+        $idsParam = $request->trimmed('ids');
+        $ids = array_filter(array_map('intval', explode(',', $idsParam)));
+
+        if ($ids) {
+            $placeholders = implode(',', array_fill(0, count($ids), '?'));
+            $products = Database::all(
+                "SELECT id, name, barcode, selling_price FROM products WHERE store_id = ? AND id IN ({$placeholders}) ORDER BY name",
+                array_merge([$storeId], $ids)
+            );
+        } else {
+            $products = Database::all(
+                "SELECT id, name, barcode, selling_price FROM products WHERE store_id = ? AND status = 'active' ORDER BY name",
+                [$storeId]
+            );
+        }
+
+        $this->view('inventory/labels', [
+            'pageTitle' => 'Print Barcode Labels',
+            'products' => $products,
+        ]);
     }
 
     public function archive(Request $request): void

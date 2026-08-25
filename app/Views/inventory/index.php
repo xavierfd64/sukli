@@ -27,6 +27,7 @@ function stock_badge(array $p): string
     <div class="flex gap-8">
         <button type="button" class="btn btn-outline" data-modal-target="#import-modal"><?= icon('archive', 16) ?> Import</button>
         <a href="<?= url('/inventory/export.csv?' . http_build_query(['q' => $search])) ?>" class="btn btn-outline"><?= icon('reports', 16) ?> Export</a>
+        <a href="<?= url('/inventory/labels') ?>" class="btn btn-outline" target="_blank"><?= icon('barcode', 16) ?> Print Labels</a>
         <a href="<?= url('/inventory/create') ?>" class="btn btn-primary"><?= icon('plus', 16) ?> Add Product</a>
     </div>
     <?php endif; ?>
@@ -70,11 +71,18 @@ function stock_badge(array $p): string
     <div class="table-wrap">
         <table class="table">
             <thead>
-                <tr><th>Product</th><th>Category</th><th>Barcode</th><th>Cost</th><th>Selling Price</th><th>Stock</th><th>Status</th><?php if ($canManage): ?><th>Actions</th><?php endif; ?></tr>
+                <tr><th></th><th>Product</th><th>Category</th><th>Barcode</th><th>Cost</th><th>Selling Price</th><th>Stock</th><th>Status</th><?php if ($canManage): ?><th>Actions</th><?php endif; ?></tr>
             </thead>
             <tbody>
             <?php foreach ($products as $p): ?>
                 <tr>
+                    <td>
+                        <?php if (!empty($p['image_path'])): ?>
+                            <img src="<?= e(\Sukli\Services\UploadService::url($p['image_path'])) ?>" alt="" class="product-thumb">
+                        <?php else: ?>
+                            <div class="product-thumb product-thumb-placeholder">NO<br>IMAGE</div>
+                        <?php endif; ?>
+                    </td>
                     <td><strong><?= e($p['name']) ?></strong></td>
                     <td class="text-muted"><?= e($p['category_name'] ?? '—') ?></td>
                     <td class="text-muted"><?= e($p['barcode'] ?? '—') ?></td>
@@ -91,12 +99,13 @@ function stock_badge(array $p): string
                                 <button type="submit" class="btn btn-sm btn-outline"><?= icon('archive', 14) ?></button>
                             </form>
                             <button type="button" class="btn btn-sm btn-outline" data-modal-target="#adjust-<?= $p['id'] ?>"><?= icon('barcode', 14) ?></button>
+                            <a href="<?= url('/inventory/labels?ids=' . $p['id']) ?>" class="btn btn-sm btn-outline" target="_blank" title="Print Label"><?= icon('reports', 14) ?></a>
                         </div>
                     </td>
                     <?php endif; ?>
                 </tr>
             <?php endforeach; ?>
-            <?php if (!$products): ?><tr><td colspan="8" class="text-muted">No products found.</td></tr><?php endif; ?>
+            <?php if (!$products): ?><tr><td colspan="9" class="text-muted">No products found.</td></tr><?php endif; ?>
             </tbody>
         </table>
     </div>

@@ -70,6 +70,7 @@ $router->get('/pos/receipt/{id}', [PosController::class, 'receipt'], [$auth]);
 $router->get('/inventory', [InventoryController::class, 'index'], [$auth]);
 $router->get('/inventory/create', [InventoryController::class, 'create'], [$auth, $ownerManager]);
 $router->post('/inventory', [InventoryController::class, 'store'], [$auth, $ownerManager, $csrf]);
+$router->get('/inventory/labels', [InventoryController::class, 'labels'], [$auth, $ownerManager]);
 $router->get('/inventory/{id}/edit', [InventoryController::class, 'edit'], [$auth, $ownerManager]);
 $router->post('/inventory/{id}', [InventoryController::class, 'update'], [$auth, $ownerManager, $csrf]);
 $router->post('/inventory/{id}/archive', [InventoryController::class, 'archive'], [$auth, $ownerManager, $csrf]);
