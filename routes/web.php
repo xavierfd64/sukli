@@ -103,6 +103,8 @@ $router->post('/utang/{customerId}/payment', [UtangController::class, 'recordPay
 
 // -- Customers / Suppliers ----------------------------------------------------
 $router->get('/customers', [CustomerController::class, 'index'], [$auth]);
+$router->get('/customers/search', [CustomerController::class, 'search'], [$auth]);
+$router->get('/customers/export.csv', [CustomerController::class, 'exportCsv'], [$auth]);
 $router->post('/customers', [CustomerController::class, 'store'], [$auth, $csrf]);
 $router->post('/customers/{id}', [CustomerController::class, 'update'], [$auth, $csrf]);
 

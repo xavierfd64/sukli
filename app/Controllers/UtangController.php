@@ -10,6 +10,8 @@ use Sukli\Core\Database;
 use Sukli\Core\Request;
 use Sukli\Core\Session;
 use Sukli\Services\AuditService;
+use Sukli\Services\CustomerSearchService;
+use Sukli\Services\PaymentMethodService;
 use Sukli\Services\UtangService;
 
 class UtangController extends Controller
@@ -19,7 +21,7 @@ class UtangController extends Controller
         $storeId = Auth::storeId();
 
         $customers = Database::all(
-            "SELECT c.id, c.name, c.contact_number, COALESCE(cca.outstanding_balance, 0) AS outstanding_balance
+            "SELECT c.id, c.first_name, c.last_name, c.contact_number, COALESCE(cca.outstanding_balance, 0) AS outstanding_balance
              FROM customers c
              LEFT JOIN customer_credit_accounts cca ON cca.customer_id = c.id
              WHERE c.store_id = ? AND COALESCE(cca.outstanding_balance, 0) > 0
@@ -71,13 +73,18 @@ class UtangController extends Controller
             [$customerId, $customerId]
         );
 
+        // Payment methods usable to pay down Utang -- everything enabled except Utang itself.
+        $payMethods = PaymentMethodService::enabled((int) $storeId);
+        unset($payMethods['utang']);
+
         $this->view('utang/show', [
-            'pageTitle' => 'Utang — ' . $customer['name'],
+            'pageTitle' => 'Utang — ' . CustomerSearchService::fullName($customer),
             'customer' => $customer,
             'balance' => $balance,
             'totalCredit' => (float) $totalCredit['total'],
             'totalPaid' => (float) $totalPaid['total'],
             'history' => $history,
+            'payMethods' => $payMethods,
         ]);
     }
 
@@ -98,7 +105,12 @@ class UtangController extends Controller
             $this->redirect('/utang/' . $customerId);
         }
 
-        $method = in_array($request->input('payment_method'), ['cash', 'gcash'], true) ? $request->input('payment_method') : 'cash';
+        $method = $request->input('payment_method', 'cash');
+        if ($method === 'utang' || !PaymentMethodService::isEnabled($storeId, (string) $method)) {
+            Session::flash('error', 'That payment method is not available.');
+            $this->redirect('/utang/' . $customerId);
+        }
+
         $note = $request->trimmed('note') ?: null;
 
         UtangService::recordPayment($storeId, $customerId, $amount, $method, $note);

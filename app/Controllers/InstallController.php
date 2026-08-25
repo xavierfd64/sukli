@@ -263,14 +263,7 @@ class InstallController extends Controller
 
         try {
             $this->runSqlFile($pdo, __DIR__ . '/../../database/schema.sql');
-
-            $pdo->exec("
-                INSERT INTO roles (id, role_key, name, description) VALUES
-                    (1, 'owner', 'Owner', 'Full access: settings, feature management, users, reports, all records.'),
-                    (2, 'manager', 'Manager', 'Most operational access with limited sensitive settings.'),
-                    (3, 'cashier', 'Cashier', 'POS access and limited operational records only.')
-                ON DUPLICATE KEY UPDATE name = VALUES(name)
-            ");
+            $this->seedRolesAndPermissions($pdo);
 
             $orgId = (int) ($pdo->query('SELECT id FROM organizations ORDER BY id LIMIT 1')->fetchColumn() ?: 0);
             if ($orgId === 0) {
@@ -301,10 +294,51 @@ class InstallController extends Controller
             foreach ([
                 'business_currency' => 'PHP',
                 'date_format' => 'M d, Y',
-                'payment_methods_enabled' => 'cash,gcash,utang',
+                'receipt_show_address' => '1',
+                'receipt_show_phone' => '1',
+                'receipt_show_logo' => '1',
+                'auto_print_receipt' => '0',
                 'low_stock_threshold_default' => '5',
             ] as $key => $value) {
                 $settingsStmt->execute([$storeId, $key, $value]);
+            }
+
+            $paymentMethodStmt = $pdo->prepare(
+                "INSERT INTO payment_methods (store_id, method_key, name, is_enabled, sort_order)
+                 VALUES (?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE name = VALUES(name)"
+            );
+            foreach ([
+                ['cash', 'Cash', 1, 1], ['gcash', 'GCash', 1, 2], ['utang', 'Utang', 1, 3],
+                ['ewallet', 'E-Wallet', 0, 4], ['bank_transfer', 'Bank Transfer', 0, 5], ['other', 'Other', 0, 6],
+            ] as [$key, $name, $enabled, $sort]) {
+                $paymentMethodStmt->execute([$storeId, $key, $name, $enabled, $sort]);
+            }
+
+            $categoryStmt = $pdo->prepare(
+                "INSERT INTO expense_categories (store_id, name) VALUES (?, ?) ON DUPLICATE KEY UPDATE name = VALUES(name)"
+            );
+            foreach (['Restock / Supplies', 'Utilities', 'Rent', 'Transportation', 'Salary', 'Other'] as $name) {
+                $categoryStmt->execute([$storeId, $name]);
+            }
+
+            $networkStmt = $pdo->prepare(
+                "INSERT INTO networks (store_id, name, is_enabled, sort_order) VALUES (?, ?, 1, ?) ON DUPLICATE KEY UPDATE is_enabled = VALUES(is_enabled)"
+            );
+            foreach (['Globe', 'Smart', 'TM', 'TNT', 'DITO'] as $i => $name) {
+                $networkStmt->execute([$storeId, $name, $i + 1]);
+            }
+
+            $bracketCountStmt = $pdo->prepare('SELECT COUNT(*) FROM gcash_charge_brackets WHERE store_id = ?');
+            $bracketCountStmt->execute([$storeId]);
+            if ((int) $bracketCountStmt->fetchColumn() === 0) {
+                $bracketStmt = $pdo->prepare(
+                    'INSERT INTO gcash_charge_brackets (store_id, min_amount, max_amount, charge, sort_order) VALUES (?, ?, ?, ?, ?)'
+                );
+                foreach ([
+                    [1, 500, 10, 1], [501, 1000, 20, 2], [1001, 5000, 50, 3], [5001, null, 100, 4],
+                ] as [$min, $max, $charge, $sort]) {
+                    $bracketStmt->execute([$storeId, $min, $max, $charge, $sort]);
+                }
             }
 
             Session::put(self::SESSION_ORG_ID, $orgId);
@@ -462,6 +496,70 @@ class InstallController extends Controller
             error_log('[Sukli Installer] DB connection failed: ' . $e->getMessage());
             return ['ok' => false, 'message' => 'Unable to connect to the database. Please check your database credentials and try again.'];
         }
+    }
+
+    /**
+     * Seeds the 3 built-in system roles, the permission catalog, and a
+     * default permission matrix that mirrors this build's route-level
+     * protection exactly (Owner: everything; Manager: everything except
+     * Users/Settings; Cashier: POS + limited operational records) --
+     * changing nothing about current behavior until an admin edits a
+     * role's permissions from Settings -> Roles & Permissions.
+     */
+    private function seedRolesAndPermissions(PDO $pdo): void
+    {
+        $pdo->exec("
+            INSERT INTO roles (id, store_id, role_key, name, description, is_system) VALUES
+                (1, NULL, 'owner', 'Owner', 'Full access: settings, feature management, users, reports, all records.', 1),
+                (2, NULL, 'manager', 'Manager', 'Most operational access with limited sensitive settings.', 1),
+                (3, NULL, 'cashier', 'Cashier', 'POS access and limited operational records only.', 1)
+            ON DUPLICATE KEY UPDATE name = VALUES(name)
+        ");
+
+        $pdo->exec("
+            INSERT INTO permissions (id, module, action, label, sort_order) VALUES
+                (1, 'pos', 'view', 'View POS', 1),
+                (2, 'pos', 'create_sale', 'Create Sale', 2),
+                (3, 'pos', 'cancel_transaction', 'Cancel Transaction', 3),
+                (4, 'inventory', 'view', 'View Inventory', 1),
+                (5, 'inventory', 'add', 'Add Product', 2),
+                (6, 'inventory', 'edit', 'Edit Product', 3),
+                (7, 'inventory', 'delete', 'Archive/Delete Product', 4),
+                (8, 'income', 'view', 'View Income', 1),
+                (9, 'expenses', 'view', 'View Expenses', 1),
+                (10, 'expenses', 'add', 'Add Expense', 2),
+                (11, 'expenses', 'delete', 'Delete Expense', 3),
+                (12, 'eload', 'view', 'View E-Load', 1),
+                (13, 'eload', 'add', 'Add E-Load Transaction', 2),
+                (14, 'gcash', 'view', 'View GCash', 1),
+                (15, 'gcash', 'add', 'Add GCash Transaction', 2),
+                (16, 'utang', 'view', 'View Utang', 1),
+                (17, 'utang', 'record_payment', 'Record Utang Payment', 2),
+                (18, 'customers', 'view', 'View Customers', 1),
+                (19, 'customers', 'add', 'Add Customer', 2),
+                (20, 'customers', 'edit', 'Edit Customer', 3),
+                (21, 'suppliers', 'view', 'View Suppliers', 1),
+                (22, 'suppliers', 'add', 'Add Supplier', 2),
+                (23, 'suppliers', 'edit', 'Edit Supplier', 3),
+                (24, 'reports', 'view', 'View Reports', 1),
+                (25, 'users', 'manage', 'Manage Users & Roles', 1),
+                (26, 'settings', 'manage', 'Manage Settings', 1),
+                (27, 'audit_log', 'view', 'View Audit Log', 1)
+            ON DUPLICATE KEY UPDATE label = VALUES(label)
+        ");
+
+        $pdo->exec("INSERT INTO role_permissions (role_id, permission_id, allowed) SELECT 1, id, 1 FROM permissions ON DUPLICATE KEY UPDATE allowed = VALUES(allowed)");
+        $pdo->exec("INSERT INTO role_permissions (role_id, permission_id, allowed) SELECT 2, id, 1 FROM permissions WHERE module NOT IN ('users','settings') ON DUPLICATE KEY UPDATE allowed = VALUES(allowed)");
+        $pdo->exec("INSERT INTO role_permissions (role_id, permission_id, allowed) SELECT 2, id, 0 FROM permissions WHERE module IN ('users','settings') ON DUPLICATE KEY UPDATE allowed = VALUES(allowed)");
+
+        $cashierAllowed = "(module,action) IN (
+            ('pos','view'),('pos','create_sale'),('inventory','view'),('income','view'),
+            ('expenses','view'),('expenses','add'),('eload','view'),('eload','add'),
+            ('gcash','view'),('gcash','add'),('utang','view'),('utang','record_payment'),
+            ('customers','view'),('customers','add'),('customers','edit')
+        )";
+        $pdo->exec("INSERT INTO role_permissions (role_id, permission_id, allowed) SELECT 3, id, 1 FROM permissions WHERE {$cashierAllowed} ON DUPLICATE KEY UPDATE allowed = VALUES(allowed)");
+        $pdo->exec("INSERT INTO role_permissions (role_id, permission_id, allowed) SELECT 3, id, 0 FROM permissions WHERE NOT {$cashierAllowed} ON DUPLICATE KEY UPDATE allowed = VALUES(allowed)");
     }
 
     private function runSqlFile(PDO $pdo, string $path): void

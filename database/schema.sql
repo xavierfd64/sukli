@@ -39,18 +39,49 @@ CREATE TABLE IF NOT EXISTS stores (
 -- Users / Roles / Access
 -- ---------------------------------------------------------------------------
 
+-- store_id NULL = one of the 3 built-in system roles (Owner/Manager/
+-- Cashier), shared across every store; store_id set = a custom role an
+-- Owner created for their store. is_system protects the built-ins from
+-- rename/delete so existing role-based behavior can never be broken from
+-- the Roles screen.
 CREATE TABLE IF NOT EXISTS roles (
-    id TINYINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-    role_key VARCHAR(30) NOT NULL UNIQUE,
+    id SMALLINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    store_id INT UNSIGNED NULL,
+    role_key VARCHAR(30) NOT NULL,
     name VARCHAR(50) NOT NULL,
-    description VARCHAR(255) NULL
+    description VARCHAR(255) NULL,
+    is_system TINYINT(1) NOT NULL DEFAULT 0,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY uq_roles_store_key (store_id, role_key),
+    CONSTRAINT fk_roles_store FOREIGN KEY (store_id) REFERENCES stores(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Fixed catalog of permission checks the app enforces server-side. Not
+-- store-scoped -- this is "what the system supports", not per-store data.
+CREATE TABLE IF NOT EXISTS permissions (
+    id SMALLINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    module VARCHAR(40) NOT NULL,
+    action VARCHAR(40) NOT NULL,
+    label VARCHAR(100) NOT NULL,
+    sort_order SMALLINT UNSIGNED NOT NULL DEFAULT 0,
+    UNIQUE KEY uq_permissions_module_action (module, action)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS role_permissions (
+    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    role_id SMALLINT UNSIGNED NOT NULL,
+    permission_id SMALLINT UNSIGNED NOT NULL,
+    allowed TINYINT(1) NOT NULL DEFAULT 0,
+    UNIQUE KEY uq_role_permission (role_id, permission_id),
+    CONSTRAINT fk_role_perm_role FOREIGN KEY (role_id) REFERENCES roles(id) ON DELETE CASCADE,
+    CONSTRAINT fk_role_perm_permission FOREIGN KEY (permission_id) REFERENCES permissions(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS users (
     id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     organization_id INT UNSIGNED NOT NULL,
     store_id INT UNSIGNED NULL,
-    role_id TINYINT UNSIGNED NOT NULL,
+    role_id SMALLINT UNSIGNED NOT NULL,
     name VARCHAR(150) NOT NULL,
     username VARCHAR(60) NOT NULL UNIQUE,
     email VARCHAR(150) NULL,
@@ -106,6 +137,7 @@ CREATE TABLE IF NOT EXISTS products (
     category_id INT UNSIGNED NULL,
     name VARCHAR(150) NOT NULL,
     barcode VARCHAR(64) NULL,
+    image_path VARCHAR(255) NULL,
     unit VARCHAR(30) NOT NULL DEFAULT 'pc',
     cost_price DECIMAL(10,2) NOT NULL DEFAULT 0.00,
     selling_price DECIMAL(10,2) NOT NULL DEFAULT 0.00,
@@ -146,7 +178,8 @@ CREATE TABLE IF NOT EXISTS inventory_transactions (
 CREATE TABLE IF NOT EXISTS customers (
     id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     store_id INT UNSIGNED NOT NULL,
-    name VARCHAR(150) NOT NULL,
+    first_name VARCHAR(100) NOT NULL,
+    last_name VARCHAR(100) NULL,
     contact_number VARCHAR(30) NULL,
     address VARCHAR(255) NULL,
     notes VARCHAR(255) NULL,
@@ -182,7 +215,7 @@ CREATE TABLE IF NOT EXISTS sales (
     subtotal DECIMAL(10,2) NOT NULL DEFAULT 0.00,
     discount_amount DECIMAL(10,2) NOT NULL DEFAULT 0.00,
     total DECIMAL(10,2) NOT NULL DEFAULT 0.00,
-    payment_method ENUM('cash','gcash','utang') NOT NULL,
+    payment_method ENUM('cash','gcash','utang','ewallet','bank_transfer','other','split') NOT NULL,
     amount_tendered DECIMAL(10,2) NULL,
     change_amount DECIMAL(10,2) NULL,
     status ENUM('completed','voided') NOT NULL DEFAULT 'completed',
@@ -210,7 +243,7 @@ CREATE TABLE IF NOT EXISTS sale_items (
 CREATE TABLE IF NOT EXISTS payments (
     id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     sale_id BIGINT UNSIGNED NOT NULL,
-    method ENUM('cash','gcash','utang') NOT NULL,
+    method ENUM('cash','gcash','utang','ewallet','bank_transfer','other') NOT NULL,
     amount DECIMAL(10,2) NOT NULL,
     reference_no VARCHAR(60) NULL,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -244,7 +277,7 @@ CREATE TABLE IF NOT EXISTS utang_payments (
     customer_id INT UNSIGNED NOT NULL,
     utang_transaction_id BIGINT UNSIGNED NULL,
     amount DECIMAL(10,2) NOT NULL,
-    payment_method ENUM('cash','gcash') NOT NULL DEFAULT 'cash',
+    payment_method ENUM('cash','gcash','ewallet','bank_transfer','other') NOT NULL DEFAULT 'cash',
     note VARCHAR(255) NULL,
     created_by INT UNSIGNED NULL,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -282,6 +315,7 @@ CREATE TABLE IF NOT EXISTS expense_records (
     category VARCHAR(80) NOT NULL,
     amount DECIMAL(10,2) NOT NULL,
     description VARCHAR(255) NULL,
+    receipt_attachment_path VARCHAR(255) NULL,
     created_by INT UNSIGNED NULL,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -333,10 +367,15 @@ CREATE TABLE IF NOT EXISTS gcash_records (
 -- Suppliers
 -- ---------------------------------------------------------------------------
 
+-- At least one of company_name / contact_first_name / contact_last_name must
+-- be present -- enforced in SupplierController, not by a DB constraint (kept
+-- portable across MySQL versions that may not support CHECK constraints).
 CREATE TABLE IF NOT EXISTS suppliers (
     id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     store_id INT UNSIGNED NOT NULL,
-    name VARCHAR(150) NOT NULL,
+    company_name VARCHAR(150) NULL,
+    contact_first_name VARCHAR(100) NULL,
+    contact_last_name VARCHAR(100) NULL,
     contact_number VARCHAR(30) NULL,
     address VARCHAR(255) NULL,
     notes VARCHAR(255) NULL,
@@ -344,6 +383,60 @@ CREATE TABLE IF NOT EXISTS suppliers (
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     CONSTRAINT fk_suppliers_store FOREIGN KEY (store_id) REFERENCES stores(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ---------------------------------------------------------------------------
+-- E-Load networks / GCash charge brackets (admin-manageable lists)
+-- ---------------------------------------------------------------------------
+
+CREATE TABLE IF NOT EXISTS networks (
+    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    store_id INT UNSIGNED NOT NULL,
+    name VARCHAR(50) NOT NULL,
+    is_enabled TINYINT(1) NOT NULL DEFAULT 1,
+    sort_order SMALLINT UNSIGNED NOT NULL DEFAULT 0,
+    UNIQUE KEY uq_networks_store_name (store_id, name),
+    CONSTRAINT fk_networks_store FOREIGN KEY (store_id) REFERENCES stores(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- max_amount NULL = no upper bound (open-ended top bracket).
+CREATE TABLE IF NOT EXISTS gcash_charge_brackets (
+    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    store_id INT UNSIGNED NOT NULL,
+    min_amount DECIMAL(10,2) NOT NULL,
+    max_amount DECIMAL(10,2) NULL,
+    charge DECIMAL(10,2) NOT NULL,
+    sort_order SMALLINT UNSIGNED NOT NULL DEFAULT 0,
+    CONSTRAINT fk_gcash_bracket_store FOREIGN KEY (store_id) REFERENCES stores(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ---------------------------------------------------------------------------
+-- Expense categories (admin-manageable list backing the free-text
+-- expense_records.category column -- kept as text there for zero-risk
+-- compatibility with existing reports/grouping queries)
+-- ---------------------------------------------------------------------------
+
+CREATE TABLE IF NOT EXISTS expense_categories (
+    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    store_id INT UNSIGNED NOT NULL,
+    name VARCHAR(80) NOT NULL,
+    UNIQUE KEY uq_expense_category_store_name (store_id, name),
+    CONSTRAINT fk_expense_category_store FOREIGN KEY (store_id) REFERENCES stores(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ---------------------------------------------------------------------------
+-- Payment methods (POS / split payment / Utang payment availability)
+-- ---------------------------------------------------------------------------
+
+CREATE TABLE IF NOT EXISTS payment_methods (
+    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    store_id INT UNSIGNED NOT NULL,
+    method_key ENUM('cash','gcash','utang','ewallet','bank_transfer','other') NOT NULL,
+    name VARCHAR(50) NOT NULL,
+    is_enabled TINYINT(1) NOT NULL DEFAULT 1,
+    sort_order SMALLINT UNSIGNED NOT NULL DEFAULT 0,
+    UNIQUE KEY uq_payment_method_store_key (store_id, method_key),
+    CONSTRAINT fk_payment_method_store FOREIGN KEY (store_id) REFERENCES stores(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ---------------------------------------------------------------------------

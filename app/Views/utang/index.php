@@ -26,7 +26,7 @@
             <tbody>
             <?php foreach ($customers as $c): ?>
                 <tr>
-                    <td><strong><?= e($c['name']) ?></strong></td>
+                    <td><strong><?= e(trim($c['first_name'] . ' ' . ($c['last_name'] ?? ''))) ?></strong></td>
                     <td class="text-muted"><?= e($c['contact_number'] ?? '—') ?></td>
                     <td><span class="badge badge-amber"><?= money($c['outstanding_balance']) ?></span></td>
                     <td><a href="<?= url('/utang/' . $c['id']) ?>" class="btn btn-sm btn-outline">View / Record Payment</a></td>

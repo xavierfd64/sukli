@@ -7,12 +7,15 @@
         <h2 style="margin:0;">Customers</h2>
         <p class="text-muted" style="margin:0;">Manage customer records and credit accounts</p>
     </div>
-    <button type="button" class="btn btn-primary" data-modal-target="#add-customer"><?= icon('plus', 16) ?> Add Customer</button>
+    <div class="flex gap-8">
+        <a href="<?= url('/customers/export.csv?' . http_build_query(['q' => $search])) ?>" class="btn btn-outline"><?= icon('reports', 16) ?> Download Report</a>
+        <button type="button" class="btn btn-primary" data-modal-target="#add-customer"><?= icon('plus', 16) ?> Add Customer</button>
+    </div>
 </div>
 
 <div class="card mb-16">
     <form method="get" action="<?= url('/customers') ?>" class="flex gap-12">
-        <input class="form-control" type="text" name="q" value="<?= e($search) ?>" placeholder="Search name or contact number">
+        <input class="form-control" type="text" name="q" value="<?= e($search) ?>" placeholder="Search first name, last name, full name, or contact number">
         <button type="submit" class="btn btn-outline"><?= icon('search', 16) ?></button>
     </form>
 </div>
@@ -24,7 +27,7 @@
             <tbody>
             <?php foreach ($customers as $c): ?>
                 <tr>
-                    <td><strong><?= e($c['name']) ?></strong></td>
+                    <td><strong><?= e(trim($c['first_name'] . ' ' . ($c['last_name'] ?? ''))) ?></strong></td>
                     <td class="text-muted"><?= e($c['contact_number'] ?? '—') ?></td>
                     <td><?= (float) $c['outstanding_balance'] > 0 ? '<span class="badge badge-amber">' . money($c['outstanding_balance']) . '</span>' : money(0) ?></td>
                     <td><span class="badge <?= $c['status'] === 'active' ? 'badge-green' : 'badge-gray' ?>"><?= e(ucfirst($c['status'])) ?></span></td>
@@ -49,7 +52,10 @@
         <h3>Add Customer</h3>
         <form method="post" action="<?= url('/customers') ?>">
             <?= csrf_field() ?>
-            <div class="form-group"><label>Name</label><input class="form-control" name="name" required></div>
+            <div class="form-row">
+                <div class="form-group"><label>First Name</label><input class="form-control" name="first_name" required></div>
+                <div class="form-group"><label>Last Name</label><input class="form-control" name="last_name"></div>
+            </div>
             <div class="form-group"><label>Contact Number</label><input class="form-control" name="contact_number"></div>
             <div class="form-group"><label>Address</label><input class="form-control" name="address"></div>
             <div class="form-group"><label>Notes</label><input class="form-control" name="notes"></div>
@@ -64,7 +70,10 @@
         <h3>Edit Customer</h3>
         <form method="post" action="<?= url('/customers/' . $c['id']) ?>">
             <?= csrf_field() ?>
-            <div class="form-group"><label>Name</label><input class="form-control" name="name" value="<?= e($c['name']) ?>" required></div>
+            <div class="form-row">
+                <div class="form-group"><label>First Name</label><input class="form-control" name="first_name" value="<?= e($c['first_name']) ?>" required></div>
+                <div class="form-group"><label>Last Name</label><input class="form-control" name="last_name" value="<?= e($c['last_name'] ?? '') ?>"></div>
+            </div>
             <div class="form-group"><label>Contact Number</label><input class="form-control" name="contact_number" value="<?= e($c['contact_number'] ?? '') ?>"></div>
             <div class="form-group"><label>Address</label><input class="form-control" name="address" value="<?= e($c['address'] ?? '') ?>"></div>
             <div class="form-group"><label>Notes</label><input class="form-control" name="notes" value="<?= e($c['notes'] ?? '') ?>"></div>
@@ -73,7 +82,7 @@
         <form method="post" action="<?= url('/customers/' . $c['id']) ?>" class="mt-16">
             <?= csrf_field() ?>
             <input type="hidden" name="_action" value="toggle_status">
-            <input type="hidden" name="name" value="<?= e($c['name']) ?>">
+            <input type="hidden" name="first_name" value="<?= e($c['first_name']) ?>">
             <button class="btn btn-outline btn-block"><?= $c['status'] === 'active' ? 'Deactivate' : 'Reactivate' ?></button>
         </form>
     </div>
