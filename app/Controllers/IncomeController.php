@@ -8,90 +8,57 @@ use Sukli\Core\Auth;
 use Sukli\Core\Controller;
 use Sukli\Core\Database;
 use Sukli\Core\Request;
-use Sukli\Core\Session;
-use Sukli\Services\AuditService;
 
+/**
+ * Income is a summary-only view — it auto-aggregates from POS sales,
+ * E-Load profit, and GCash service charges rather than accepting manual
+ * entries. Historical rows in income_records (from before this change)
+ * are still shown, read-only, so nothing entered previously is lost.
+ */
 class IncomeController extends Controller
 {
-    private const CATEGORIES = ['Sales (Non-POS)', 'Rental', 'Commission', 'Refund', 'Other'];
-
     public function index(Request $request): void
     {
         $storeId = Auth::storeId();
         $from = $request->trimmed('from') ?: date('Y-m-01');
         $to = $request->trimmed('to') ?: date('Y-m-d');
 
-        $records = Database::all(
-            "SELECT i.*, u.name AS created_by_name FROM income_records i
-             LEFT JOIN users u ON u.id = i.created_by
-             WHERE i.store_id = ? AND i.income_date BETWEEN ? AND ?
-             ORDER BY i.income_date DESC, i.id DESC",
+        $posSales = Database::one(
+            "SELECT COUNT(*) AS cnt, COALESCE(SUM(total),0) AS total FROM sales
+             WHERE store_id = ? AND status = 'completed' AND DATE(created_at) BETWEEN ? AND ?",
+            [$storeId, $from, $to]
+        );
+        $eloadProfit = Database::one(
+            "SELECT COUNT(*) AS cnt, COALESCE(SUM(profit),0) AS total FROM eload_records
+             WHERE store_id = ? AND DATE(transacted_at) BETWEEN ? AND ?",
+            [$storeId, $from, $to]
+        );
+        $gcashCharges = Database::one(
+            "SELECT COUNT(*) AS cnt, COALESCE(SUM(service_charge),0) AS total FROM gcash_records
+             WHERE store_id = ? AND DATE(transacted_at) BETWEEN ? AND ?",
+            [$storeId, $from, $to]
+        );
+        $legacyIncome = Database::one(
+            "SELECT COUNT(*) AS cnt, COALESCE(SUM(amount),0) AS total FROM income_records
+             WHERE store_id = ? AND income_date BETWEEN ? AND ?",
             [$storeId, $from, $to]
         );
 
-        $total = array_sum(array_column($records, 'amount'));
+        $sources = [
+            ['label' => 'POS Sales Revenue', 'note' => 'Completed sales in this period', 'count' => (int) $posSales['cnt'], 'total' => (float) $posSales['total']],
+            ['label' => 'E-Load Profit', 'note' => 'Profit margin earned on E-Load transactions', 'count' => (int) $eloadProfit['cnt'], 'total' => (float) $eloadProfit['total']],
+            ['label' => 'GCash Service Charges', 'note' => 'Charges earned from Cash-In / Cash-Out', 'count' => (int) $gcashCharges['cnt'], 'total' => (float) $gcashCharges['total']],
+        ];
+        if ((int) $legacyIncome['cnt'] > 0) {
+            $sources[] = ['label' => 'Other (Legacy Manual Entries)', 'note' => 'Recorded before Income became a summary-only view', 'count' => (int) $legacyIncome['cnt'], 'total' => (float) $legacyIncome['total']];
+        }
 
         $this->view('income/index', [
-            'pageTitle' => 'Income',
-            'records' => $records,
-            'total' => $total,
+            'pageTitle' => 'Income Summary',
+            'sources' => $sources,
+            'totalIncome' => array_sum(array_column($sources, 'total')),
             'from' => $from,
             'to' => $to,
-            'categories' => self::CATEGORIES,
         ]);
-    }
-
-    public function store(Request $request): void
-    {
-        $storeId = Auth::storeId();
-        $amount = (float) $request->input('amount', 0);
-        $date = $request->trimmed('income_date') ?: date('Y-m-d');
-        $category = $request->trimmed('category') ?: 'Other';
-
-        if ($amount <= 0) {
-            Session::flash('error', 'Enter a valid amount.');
-            $this->back('/income');
-        }
-
-        Database::execute(
-            "INSERT INTO income_records (store_id, income_date, category, amount, description, created_by) VALUES (?, ?, ?, ?, ?, ?)",
-            [$storeId, $date, $category, $amount, $request->trimmed('description') ?: null, Auth::id()]
-        );
-        $id = (int) Database::lastInsertId();
-
-        AuditService::log('create', 'income', 'income_record', $id, null, ['amount' => $amount, 'category' => $category]);
-        Session::flash('success', 'Income recorded.');
-        $this->back('/income');
-    }
-
-    public function update(Request $request): void
-    {
-        $id = (int) $request->param('id');
-        $storeId = Auth::storeId();
-        $existing = Database::one("SELECT id FROM income_records WHERE id = ? AND store_id = ?", [$id, $storeId]);
-        if (!$existing) {
-            Session::flash('error', 'Record not found.');
-            $this->back('/income');
-        }
-
-        Database::execute(
-            "UPDATE income_records SET income_date=?, category=?, amount=?, description=?, updated_at=NOW() WHERE id = ? AND store_id = ?",
-            [$request->trimmed('income_date'), $request->trimmed('category'), (float) $request->input('amount', 0),
-             $request->trimmed('description') ?: null, $id, $storeId]
-        );
-
-        AuditService::log('update', 'income', 'income_record', $id);
-        Session::flash('success', 'Income updated.');
-        $this->back('/income');
-    }
-
-    public function destroy(Request $request): void
-    {
-        $id = (int) $request->param('id');
-        $storeId = Auth::storeId();
-        Database::execute("DELETE FROM income_records WHERE id = ? AND store_id = ?", [$id, $storeId]);
-        AuditService::log('delete', 'income', 'income_record', $id);
-        Session::flash('success', 'Income record deleted.');
-        $this->back('/income');
     }
 }

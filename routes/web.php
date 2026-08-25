@@ -80,9 +80,6 @@ $router->post('/inventory/import', [InventoryController::class, 'importCsv'], [$
 
 // -- Income / Expenses --------------------------------------------------------
 $router->get('/income', [IncomeController::class, 'index'], [$auth]);
-$router->post('/income', [IncomeController::class, 'store'], [$auth, $csrf]);
-$router->post('/income/{id}', [IncomeController::class, 'update'], [$auth, $ownerManager, $csrf]);
-$router->post('/income/{id}/delete', [IncomeController::class, 'destroy'], [$auth, $ownerManager, $csrf]);
 
 $router->get('/expenses', [ExpenseController::class, 'index'], [$auth]);
 $router->post('/expenses', [ExpenseController::class, 'store'], [$auth, $csrf]);
