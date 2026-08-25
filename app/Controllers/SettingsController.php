@@ -11,6 +11,7 @@ use Sukli\Core\Request;
 use Sukli\Core\Session;
 use Sukli\Services\AuditService;
 use Sukli\Services\FeatureService;
+use Sukli\Services\NetworkService;
 use Sukli\Services\PaymentMethodService;
 use Sukli\Services\SystemSettingsService;
 use Sukli\Services\TimezoneService;
@@ -96,6 +97,44 @@ class SettingsController extends Controller
         AuditService::log('update', 'settings', 'payment_methods', $storeId, null, $input);
         Session::flash('success', 'Payment method settings saved.');
         $this->redirect('/settings/payment-methods');
+    }
+
+    public function networks(Request $request): void
+    {
+        $storeId = (int) Auth::storeId();
+        $this->view('settings/networks', [
+            'pageTitle' => 'E-Load Networks',
+            'networks' => NetworkService::all($storeId),
+        ]);
+    }
+
+    public function storeNetwork(Request $request): void
+    {
+        $storeId = (int) Auth::storeId();
+        $name = $request->trimmed('name');
+        if (!$name) {
+            Session::flash('error', 'Enter a network name.');
+            $this->back('/settings/networks');
+        }
+
+        try {
+            NetworkService::create($storeId, $name);
+            AuditService::log('create', 'settings', 'network', 0, null, ['name' => $name]);
+            Session::flash('success', 'Network added.');
+        } catch (\Throwable $e) {
+            Session::flash('error', 'That network already exists.');
+        }
+        $this->back('/settings/networks');
+    }
+
+    public function toggleNetwork(Request $request): void
+    {
+        $storeId = (int) Auth::storeId();
+        $id = (int) $request->param('id');
+        NetworkService::toggle($storeId, $id);
+        AuditService::log('update', 'settings', 'network', $id);
+        Session::flash('success', 'Network updated.');
+        $this->back('/settings/networks');
     }
 
     public function features(Request $request): void

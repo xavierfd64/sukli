@@ -10,6 +10,8 @@ use Sukli\Core\Database;
 use Sukli\Core\Request;
 use Sukli\Core\Session;
 use Sukli\Services\AuditService;
+use Sukli\Services\CustomerSearchService;
+use Sukli\Services\NetworkService;
 
 class EloadController extends Controller
 {
@@ -31,12 +33,24 @@ class EloadController extends Controller
             'profit' => array_sum(array_column($records, 'profit')),
         ];
 
+        $customerRows = Database::all(
+            "SELECT id, first_name, last_name, contact_number FROM customers WHERE store_id = ? AND status = 'active' ORDER BY first_name, last_name",
+            [$storeId]
+        );
+        $customers = array_map(static fn (array $c) => [
+            'id' => (int) $c['id'],
+            'name' => CustomerSearchService::fullName($c),
+            'contact_number' => $c['contact_number'],
+        ], $customerRows);
+
         $this->view('eload/index', [
             'pageTitle' => 'E-Load Records',
             'records' => $records,
             'totals' => $totals,
             'from' => $from,
             'to' => $to,
+            'customers' => $customers,
+            'networks' => NetworkService::enabled((int) $storeId),
         ]);
     }
 
@@ -53,11 +67,12 @@ class EloadController extends Controller
         }
 
         $profit = round($amountReceived - $cost, 2);
+        $customerName = $request->trimmed('customer_name') ?: 'Walk-In';
 
         Database::execute(
             "INSERT INTO eload_records (store_id, transacted_at, customer_name, mobile_number, network, load_amount, amount_received, cost, profit, notes, created_by)
              VALUES (?, NOW(), ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-            [$storeId, $request->trimmed('customer_name') ?: null, $request->trimmed('mobile_number') ?: null,
+            [$storeId, $customerName, $request->trimmed('mobile_number') ?: null,
              $request->trimmed('network') ?: null, $loadAmount, $amountReceived, $cost, $profit,
              $request->trimmed('notes') ?: null, Auth::id()]
         );

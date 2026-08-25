@@ -3,6 +3,8 @@
 /** @var array $totals */
 /** @var string $from */
 /** @var string $to */
+/** @var array $customers */
+/** @var array $networks */
 ?>
 <div class="flex items-center justify-between mb-16" style="flex-wrap:wrap;gap:10px;">
     <div>
@@ -51,13 +53,26 @@
 <div class="modal-backdrop" id="add-eload">
     <div class="modal">
         <h3>Add E-Load Transaction</h3>
-        <form method="post" action="<?= url('/eload') ?>">
+        <form method="post" action="<?= url('/eload') ?>" id="eload-form">
             <?= csrf_field() ?>
-            <div class="form-row">
-                <div class="form-group"><label>Customer Name</label><input class="form-control" name="customer_name"></div>
-                <div class="form-group"><label>Mobile Number</label><input class="form-control" name="mobile_number"></div>
+            <div class="form-group">
+                <label>Customer</label>
+                <input type="text" id="eload-customer-search" class="form-control" placeholder="Search customer, or leave blank for Walk-In" autocomplete="off">
+                <div id="eload-customer-results" class="pos-customer-results"></div>
+                <div id="eload-customer-selected"></div>
+                <input type="hidden" name="customer_name" id="eload-customer-name">
             </div>
-            <div class="form-group"><label>Network</label><input class="form-control" name="network" placeholder="Smart, Globe, TNT, DITO..."></div>
+            <div class="form-group"><label>Mobile Number Loaded</label><input class="form-control" name="mobile_number" placeholder="The number receiving the load"></div>
+            <div class="form-group">
+                <label>Network</label>
+                <select class="form-control" name="network">
+                    <option value="">Select network...</option>
+                    <?php foreach ($networks as $n): ?>
+                        <option value="<?= e($n) ?>"><?= e($n) ?></option>
+                    <?php endforeach; ?>
+                </select>
+                <?php if (!$networks): ?><div class="form-hint">No networks enabled — add one in Settings &rarr; E-Load Networks.</div><?php endif; ?>
+            </div>
             <div class="form-row">
                 <div class="form-group"><label>Load Amount</label><input class="form-control" type="number" step="0.01" min="0.01" name="load_amount" required></div>
                 <div class="form-group"><label>Amount Received from Customer</label><input class="form-control" type="number" step="0.01" min="0.01" name="amount_received" required></div>
@@ -68,3 +83,22 @@
         </form>
     </div>
 </div>
+
+<script src="<?= asset('js/customer-picker.js') ?>"></script>
+<script>
+(function () {
+    var nameHidden = document.getElementById('eload-customer-name');
+    SukliCustomerPicker({
+        input: document.getElementById('eload-customer-search'),
+        results: document.getElementById('eload-customer-results'),
+        selected: document.getElementById('eload-customer-selected'),
+        customers: <?= json_encode($customers) ?>,
+        onSelect: function (c) { nameHidden.value = c.name; },
+        onClear: function () { nameHidden.value = ''; },
+    });
+
+    document.getElementById('eload-form').addEventListener('submit', function () {
+        if (!nameHidden.value) nameHidden.value = 'Walk-In';
+    });
+})();
+</script>
