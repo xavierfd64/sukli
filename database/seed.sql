@@ -32,6 +32,7 @@ INSERT INTO permissions (id, module, action, label, sort_order) VALUES
     (9, 'expenses', 'view', 'View Expenses', 1),
     (10, 'expenses', 'add', 'Add Expense', 2),
     (11, 'expenses', 'delete', 'Delete Expense', 3),
+    (28, 'expenses', 'edit', 'Edit Expense', 4),
     (12, 'eload', 'view', 'View E-Load', 1),
     (13, 'eload', 'add', 'Add E-Load Transaction', 2),
     (14, 'gcash', 'view', 'View GCash', 1),
@@ -58,10 +59,10 @@ SELECT 1, id, 1 FROM permissions -- Owner: everything
 ON DUPLICATE KEY UPDATE allowed = VALUES(allowed);
 
 INSERT INTO role_permissions (role_id, permission_id, allowed)
-SELECT 2, id, 1 FROM permissions WHERE NOT (module = 'users' OR module = 'settings')
+SELECT 2, id, 1 FROM permissions WHERE module NOT IN ('users', 'settings', 'audit_log')
 ON DUPLICATE KEY UPDATE allowed = VALUES(allowed);
 INSERT INTO role_permissions (role_id, permission_id, allowed)
-SELECT 2, id, 0 FROM permissions WHERE module = 'users' OR module = 'settings'
+SELECT 2, id, 0 FROM permissions WHERE module IN ('users', 'settings', 'audit_log')
 ON DUPLICATE KEY UPDATE allowed = VALUES(allowed);
 
 INSERT INTO role_permissions (role_id, permission_id, allowed)

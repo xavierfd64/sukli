@@ -6,8 +6,8 @@ namespace Sukli\Core;
 
 /**
  * Session-based auth with rate-limited login attempts. Authorization itself
- * (role checks) is enforced server-side in RoleMiddleware / controllers —
- * never only by hiding menu items.
+ * (permission checks) is enforced server-side in PermissionMiddleware /
+ * controllers — never only by hiding menu items.
  */
 class Auth
 {
@@ -55,6 +55,7 @@ class Auth
         Session::put('organization_id', (int) $user['organization_id']);
         Session::put('store_id', $user['store_id'] !== null ? (int) $user['store_id'] : null);
         Session::put('role_key', $user['role_key']);
+        Session::put('role_id', (int) $user['role_id']);
 
         return ['ok' => true, 'user' => $user];
     }
@@ -87,6 +88,11 @@ class Auth
     public static function role(): ?string
     {
         return Session::get('role_key');
+    }
+
+    public static function roleId(): ?int
+    {
+        return Session::get('role_id');
     }
 
     public static function hasRole(array $roles): bool

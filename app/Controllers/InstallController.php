@@ -529,6 +529,7 @@ class InstallController extends Controller
                 (9, 'expenses', 'view', 'View Expenses', 1),
                 (10, 'expenses', 'add', 'Add Expense', 2),
                 (11, 'expenses', 'delete', 'Delete Expense', 3),
+                (28, 'expenses', 'edit', 'Edit Expense', 4),
                 (12, 'eload', 'view', 'View E-Load', 1),
                 (13, 'eload', 'add', 'Add E-Load Transaction', 2),
                 (14, 'gcash', 'view', 'View GCash', 1),
@@ -549,8 +550,8 @@ class InstallController extends Controller
         ");
 
         $pdo->exec("INSERT INTO role_permissions (role_id, permission_id, allowed) SELECT 1, id, 1 FROM permissions ON DUPLICATE KEY UPDATE allowed = VALUES(allowed)");
-        $pdo->exec("INSERT INTO role_permissions (role_id, permission_id, allowed) SELECT 2, id, 1 FROM permissions WHERE module NOT IN ('users','settings') ON DUPLICATE KEY UPDATE allowed = VALUES(allowed)");
-        $pdo->exec("INSERT INTO role_permissions (role_id, permission_id, allowed) SELECT 2, id, 0 FROM permissions WHERE module IN ('users','settings') ON DUPLICATE KEY UPDATE allowed = VALUES(allowed)");
+        $pdo->exec("INSERT INTO role_permissions (role_id, permission_id, allowed) SELECT 2, id, 1 FROM permissions WHERE module NOT IN ('users','settings','audit_log') ON DUPLICATE KEY UPDATE allowed = VALUES(allowed)");
+        $pdo->exec("INSERT INTO role_permissions (role_id, permission_id, allowed) SELECT 2, id, 0 FROM permissions WHERE module IN ('users','settings','audit_log') ON DUPLICATE KEY UPDATE allowed = VALUES(allowed)");
 
         $cashierAllowed = "(module,action) IN (
             ('pos','view'),('pos','create_sale'),('inventory','view'),('income','view'),

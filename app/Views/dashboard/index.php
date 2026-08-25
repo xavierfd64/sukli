@@ -114,7 +114,9 @@ $gradientCss = $gradientStops ? implode(', ', $gradientStops) : '#e5e7eb 0% 100%
             </div>
         <?php endforeach; ?>
         <?php if (!$lowStock): ?><p class="text-muted">All stock levels look healthy.</p><?php endif; ?>
+        <?php if (can('inventory', 'view')): ?>
         <a href="<?= url('/inventory?filter=low_stock') ?>" class="btn btn-outline btn-sm mt-16">View All Products</a>
+        <?php endif; ?>
     </div>
 
     <div class="card">
@@ -137,7 +139,9 @@ $gradientCss = $gradientStops ? implode(', ', $gradientStops) : '#e5e7eb 0% 100%
     <div class="card">
         <div class="flex items-center justify-between mb-16">
             <div class="card-title" style="margin:0;">Recent Transactions</div>
+            <?php if (can('reports', 'view')): ?>
             <a href="<?= url('/reports') ?>" class="text-muted" style="font-size:12px;">View Full Report</a>
+            <?php endif; ?>
         </div>
         <div class="table-wrap">
             <table class="table">

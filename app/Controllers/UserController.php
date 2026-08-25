@@ -21,7 +21,10 @@ class UserController extends Controller
              WHERE u.store_id = ? ORDER BY u.name",
             [$storeId]
         );
-        $roles = Database::all("SELECT id, role_key, name FROM roles ORDER BY id");
+        $roles = Database::all(
+            "SELECT id, role_key, name FROM roles WHERE store_id IS NULL OR store_id = ? ORDER BY is_system DESC, name",
+            [$storeId]
+        );
 
         $this->view('users/index', [
             'pageTitle' => 'Users',

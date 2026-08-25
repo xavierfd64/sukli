@@ -4,8 +4,9 @@
 /** @var string $from */
 /** @var string $to */
 /** @var array $categories */
-$role = $currentUser['role_key'] ?? null;
-$canManage = in_array($role, ['owner', 'manager'], true);
+$canEdit = can('expenses', 'edit');
+$canDelete = can('expenses', 'delete');
+$canManage = $canEdit || $canDelete;
 ?>
 <div class="flex items-center justify-between mb-16" style="flex-wrap:wrap;gap:10px;">
     <div>
@@ -43,11 +44,15 @@ $canManage = in_array($role, ['owner', 'manager'], true);
                     <?php if ($canManage): ?>
                     <td>
                         <div class="flex gap-8">
+                            <?php if ($canEdit): ?>
                             <button type="button" class="btn btn-sm btn-outline" data-modal-target="#edit-expense-<?= $r['id'] ?>"><?= icon('edit', 14) ?></button>
+                            <?php endif; ?>
+                            <?php if ($canDelete): ?>
                             <form method="post" action="<?= url('/expenses/' . $r['id'] . '/delete') ?>" data-confirm="Delete this expense record?">
                                 <?= csrf_field() ?>
                                 <button type="submit" class="btn btn-sm btn-danger"><?= icon('trash', 14) ?></button>
                             </form>
+                            <?php endif; ?>
                         </div>
                     </td>
                     <?php endif; ?>
@@ -81,7 +86,7 @@ $canManage = in_array($role, ['owner', 'manager'], true);
     </div>
 </div>
 
-<?php if ($canManage): foreach ($records as $r): ?>
+<?php if ($canEdit): foreach ($records as $r): ?>
 <div class="modal-backdrop" id="edit-expense-<?= $r['id'] ?>">
     <div class="modal">
         <h3>Edit Expense</h3>

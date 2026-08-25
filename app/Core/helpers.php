@@ -7,10 +7,16 @@ use Sukli\Core\Csrf;
 use Sukli\Core\Icons;
 use Sukli\Core\Session;
 use Sukli\Core\View;
+use Sukli\Services\PermissionService;
 
 function e(?string $value): string
 {
     return htmlspecialchars($value ?? '', ENT_QUOTES, 'UTF-8');
+}
+
+function can(string $module, string $action): bool
+{
+    return PermissionService::roleHas(Auth::roleId(), $module, $action);
 }
 
 function config_value(string $key, mixed $default = null): mixed

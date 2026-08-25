@@ -7,7 +7,10 @@
         <h2 style="margin:0;">Users</h2>
         <p class="text-muted" style="margin:0;">Manage store user accounts and roles</p>
     </div>
-    <button type="button" class="btn btn-primary" data-modal-target="#add-user"><?= icon('plus', 16) ?> Add User</button>
+    <div class="flex gap-8">
+        <a href="<?= url('/roles') ?>" class="btn btn-outline"><?= icon('settings', 16) ?> Roles &amp; Permissions</a>
+        <button type="button" class="btn btn-primary" data-modal-target="#add-user"><?= icon('plus', 16) ?> Add User</button>
+    </div>
 </div>
 
 <div class="card">

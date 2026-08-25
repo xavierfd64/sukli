@@ -16,6 +16,7 @@ use Sukli\Controllers\InstallController;
 use Sukli\Controllers\InventoryController;
 use Sukli\Controllers\PosController;
 use Sukli\Controllers\ReportController;
+use Sukli\Controllers\RoleController;
 use Sukli\Controllers\SettingsController;
 use Sukli\Controllers\SupplierController;
 use Sukli\Controllers\UserController;
@@ -24,16 +25,17 @@ use Sukli\Middleware\AuthMiddleware;
 use Sukli\Middleware\CsrfMiddleware;
 use Sukli\Middleware\FeatureMiddleware;
 use Sukli\Middleware\GuestMiddleware;
-use Sukli\Middleware\RoleMiddleware;
+use Sukli\Middleware\PermissionMiddleware;
 
 $auth = AuthMiddleware::handle();
 $guest = GuestMiddleware::handle();
 $csrf = CsrfMiddleware::handle();
-$ownerOnly = RoleMiddleware::only(['owner']);
-$ownerManager = RoleMiddleware::only(['owner', 'manager']);
 $eloadOn = FeatureMiddleware::require('eload');
 $gcashOn = FeatureMiddleware::require('gcash');
 $utangOn = FeatureMiddleware::require('utang');
+
+/** Shorthand for PermissionMiddleware::requires() — granular module/action checks (see database/seed.sql for the default matrix). */
+$perm = static fn (string $module, string $action) => PermissionMiddleware::requires($module, $action);
 
 // -- Installer (public, self-contained — see app/Controllers/InstallController) --
 $router->get('/install', [InstallController::class, 'welcome']);
@@ -62,81 +64,88 @@ $router->post('/logout', [AuthController::class, 'logout'], [$auth, $csrf]);
 $router->get('/dashboard', [DashboardController::class, 'index'], [$auth]);
 
 // -- POS --------------------------------------------------------------------
-$router->get('/pos', [PosController::class, 'index'], [$auth]);
-$router->post('/pos/checkout', [PosController::class, 'checkout'], [$auth, $csrf]);
-$router->get('/pos/receipt/{id}', [PosController::class, 'receipt'], [$auth]);
+$router->get('/pos', [PosController::class, 'index'], [$auth, $perm('pos', 'view')]);
+$router->post('/pos/checkout', [PosController::class, 'checkout'], [$auth, $perm('pos', 'create_sale'), $csrf]);
+$router->get('/pos/receipt/{id}', [PosController::class, 'receipt'], [$auth, $perm('pos', 'view')]);
 
 // -- Inventory --------------------------------------------------------------
-$router->get('/inventory', [InventoryController::class, 'index'], [$auth]);
-$router->get('/inventory/create', [InventoryController::class, 'create'], [$auth, $ownerManager]);
-$router->post('/inventory', [InventoryController::class, 'store'], [$auth, $ownerManager, $csrf]);
-$router->get('/inventory/labels', [InventoryController::class, 'labels'], [$auth, $ownerManager]);
-$router->get('/inventory/{id}/edit', [InventoryController::class, 'edit'], [$auth, $ownerManager]);
-$router->post('/inventory/{id}', [InventoryController::class, 'update'], [$auth, $ownerManager, $csrf]);
-$router->post('/inventory/{id}/archive', [InventoryController::class, 'archive'], [$auth, $ownerManager, $csrf]);
-$router->post('/inventory/{id}/adjust', [InventoryController::class, 'adjustStock'], [$auth, $ownerManager, $csrf]);
-$router->post('/inventory/categories', [InventoryController::class, 'storeCategory'], [$auth, $ownerManager, $csrf]);
-$router->get('/inventory/export.csv', [InventoryController::class, 'exportCsv'], [$auth, $ownerManager]);
-$router->post('/inventory/import', [InventoryController::class, 'importCsv'], [$auth, $ownerManager, $csrf]);
+$router->get('/inventory', [InventoryController::class, 'index'], [$auth, $perm('inventory', 'view')]);
+$router->get('/inventory/create', [InventoryController::class, 'create'], [$auth, $perm('inventory', 'add')]);
+$router->post('/inventory', [InventoryController::class, 'store'], [$auth, $perm('inventory', 'add'), $csrf]);
+$router->get('/inventory/labels', [InventoryController::class, 'labels'], [$auth, $perm('inventory', 'edit')]);
+$router->get('/inventory/{id}/edit', [InventoryController::class, 'edit'], [$auth, $perm('inventory', 'edit')]);
+$router->post('/inventory/{id}', [InventoryController::class, 'update'], [$auth, $perm('inventory', 'edit'), $csrf]);
+$router->post('/inventory/{id}/archive', [InventoryController::class, 'archive'], [$auth, $perm('inventory', 'delete'), $csrf]);
+$router->post('/inventory/{id}/adjust', [InventoryController::class, 'adjustStock'], [$auth, $perm('inventory', 'edit'), $csrf]);
+$router->post('/inventory/categories', [InventoryController::class, 'storeCategory'], [$auth, $perm('inventory', 'edit'), $csrf]);
+$router->get('/inventory/export.csv', [InventoryController::class, 'exportCsv'], [$auth, $perm('inventory', 'edit')]);
+$router->post('/inventory/import', [InventoryController::class, 'importCsv'], [$auth, $perm('inventory', 'edit'), $csrf]);
 
 // -- Income / Expenses --------------------------------------------------------
-$router->get('/income', [IncomeController::class, 'index'], [$auth]);
+$router->get('/income', [IncomeController::class, 'index'], [$auth, $perm('income', 'view')]);
 
-$router->get('/expenses', [ExpenseController::class, 'index'], [$auth]);
-$router->post('/expenses', [ExpenseController::class, 'store'], [$auth, $csrf]);
-$router->post('/expenses/{id}', [ExpenseController::class, 'update'], [$auth, $ownerManager, $csrf]);
-$router->post('/expenses/{id}/delete', [ExpenseController::class, 'destroy'], [$auth, $ownerManager, $csrf]);
+$router->get('/expenses', [ExpenseController::class, 'index'], [$auth, $perm('expenses', 'view')]);
+$router->post('/expenses', [ExpenseController::class, 'store'], [$auth, $perm('expenses', 'add'), $csrf]);
+$router->post('/expenses/{id}', [ExpenseController::class, 'update'], [$auth, $perm('expenses', 'edit'), $csrf]);
+$router->post('/expenses/{id}/delete', [ExpenseController::class, 'destroy'], [$auth, $perm('expenses', 'delete'), $csrf]);
 
 // -- E-Load / GCash (feature-flagged, recording only) ------------------------
-$router->get('/eload', [EloadController::class, 'index'], [$auth, $eloadOn]);
-$router->post('/eload', [EloadController::class, 'store'], [$auth, $eloadOn, $csrf]);
+$router->get('/eload', [EloadController::class, 'index'], [$auth, $eloadOn, $perm('eload', 'view')]);
+$router->post('/eload', [EloadController::class, 'store'], [$auth, $eloadOn, $perm('eload', 'add'), $csrf]);
 
-$router->get('/gcash', [GcashController::class, 'index'], [$auth, $gcashOn]);
-$router->post('/gcash', [GcashController::class, 'store'], [$auth, $gcashOn, $csrf]);
+$router->get('/gcash', [GcashController::class, 'index'], [$auth, $gcashOn, $perm('gcash', 'view')]);
+$router->post('/gcash', [GcashController::class, 'store'], [$auth, $gcashOn, $perm('gcash', 'add'), $csrf]);
 
 // -- Utang / Credit (feature-flagged) -----------------------------------------
-$router->get('/utang', [UtangController::class, 'index'], [$auth, $utangOn]);
-$router->get('/utang/{customerId}', [UtangController::class, 'show'], [$auth, $utangOn]);
-$router->post('/utang/{customerId}/payment', [UtangController::class, 'recordPayment'], [$auth, $utangOn, $csrf]);
+$router->get('/utang', [UtangController::class, 'index'], [$auth, $utangOn, $perm('utang', 'view')]);
+$router->get('/utang/{customerId}', [UtangController::class, 'show'], [$auth, $utangOn, $perm('utang', 'view')]);
+$router->post('/utang/{customerId}/payment', [UtangController::class, 'recordPayment'], [$auth, $utangOn, $perm('utang', 'record_payment'), $csrf]);
 
 // -- Customers / Suppliers ----------------------------------------------------
-$router->get('/customers', [CustomerController::class, 'index'], [$auth]);
-$router->get('/customers/search', [CustomerController::class, 'search'], [$auth]);
-$router->get('/customers/export.csv', [CustomerController::class, 'exportCsv'], [$auth]);
-$router->post('/customers', [CustomerController::class, 'store'], [$auth, $csrf]);
-$router->post('/customers/{id}', [CustomerController::class, 'update'], [$auth, $csrf]);
+$router->get('/customers', [CustomerController::class, 'index'], [$auth, $perm('customers', 'view')]);
+$router->get('/customers/search', [CustomerController::class, 'search'], [$auth, $perm('customers', 'view')]);
+$router->get('/customers/export.csv', [CustomerController::class, 'exportCsv'], [$auth, $perm('customers', 'view')]);
+$router->post('/customers', [CustomerController::class, 'store'], [$auth, $perm('customers', 'add'), $csrf]);
+$router->post('/customers/{id}', [CustomerController::class, 'update'], [$auth, $perm('customers', 'edit'), $csrf]);
 
-$router->get('/suppliers', [SupplierController::class, 'index'], [$auth, $ownerManager]);
-$router->post('/suppliers', [SupplierController::class, 'store'], [$auth, $ownerManager, $csrf]);
-$router->post('/suppliers/{id}', [SupplierController::class, 'update'], [$auth, $ownerManager, $csrf]);
+$router->get('/suppliers', [SupplierController::class, 'index'], [$auth, $perm('suppliers', 'view')]);
+$router->post('/suppliers', [SupplierController::class, 'store'], [$auth, $perm('suppliers', 'add'), $csrf]);
+$router->post('/suppliers/{id}', [SupplierController::class, 'update'], [$auth, $perm('suppliers', 'edit'), $csrf]);
 
-// -- Users (owner only) ----------------------------------------------------
-$router->get('/users', [UserController::class, 'index'], [$auth, $ownerOnly]);
-$router->post('/users', [UserController::class, 'store'], [$auth, $ownerOnly, $csrf]);
-$router->post('/users/{id}', [UserController::class, 'update'], [$auth, $ownerOnly, $csrf]);
-$router->post('/users/{id}/deactivate', [UserController::class, 'deactivate'], [$auth, $ownerOnly, $csrf]);
+// -- Users & Roles ------------------------------------------------------------
+$router->get('/users', [UserController::class, 'index'], [$auth, $perm('users', 'manage')]);
+$router->post('/users', [UserController::class, 'store'], [$auth, $perm('users', 'manage'), $csrf]);
+$router->post('/users/{id}', [UserController::class, 'update'], [$auth, $perm('users', 'manage'), $csrf]);
+$router->post('/users/{id}/deactivate', [UserController::class, 'deactivate'], [$auth, $perm('users', 'manage'), $csrf]);
+
+$router->get('/roles', [RoleController::class, 'index'], [$auth, $perm('users', 'manage')]);
+$router->get('/roles/create', [RoleController::class, 'create'], [$auth, $perm('users', 'manage')]);
+$router->post('/roles', [RoleController::class, 'store'], [$auth, $perm('users', 'manage'), $csrf]);
+$router->get('/roles/{id}/edit', [RoleController::class, 'edit'], [$auth, $perm('users', 'manage')]);
+$router->post('/roles/{id}', [RoleController::class, 'update'], [$auth, $perm('users', 'manage'), $csrf]);
+$router->post('/roles/{id}/delete', [RoleController::class, 'destroy'], [$auth, $perm('users', 'manage'), $csrf]);
 
 // -- Reports -----------------------------------------------------------------
-$router->get('/reports', [ReportController::class, 'index'], [$auth, $ownerManager]);
+$router->get('/reports', [ReportController::class, 'index'], [$auth, $perm('reports', 'view')]);
 
-// -- Settings / Feature Management (owner only) --------------------------------
-$router->get('/settings', [SettingsController::class, 'index'], [$auth, $ownerOnly]);
-$router->post('/settings/general', [SettingsController::class, 'updateGeneral'], [$auth, $ownerOnly, $csrf]);
-$router->get('/settings/features', [SettingsController::class, 'features'], [$auth, $ownerOnly]);
-$router->post('/settings/features', [SettingsController::class, 'updateFeatures'], [$auth, $ownerOnly, $csrf]);
-$router->get('/settings/payment-methods', [SettingsController::class, 'paymentMethods'], [$auth, $ownerOnly]);
-$router->post('/settings/payment-methods', [SettingsController::class, 'updatePaymentMethods'], [$auth, $ownerOnly, $csrf]);
-$router->get('/settings/networks', [SettingsController::class, 'networks'], [$auth, $ownerOnly]);
-$router->post('/settings/networks', [SettingsController::class, 'storeNetwork'], [$auth, $ownerOnly, $csrf]);
-$router->post('/settings/networks/{id}/toggle', [SettingsController::class, 'toggleNetwork'], [$auth, $ownerOnly, $csrf]);
-$router->get('/settings/gcash-brackets', [SettingsController::class, 'gcashBrackets'], [$auth, $ownerOnly]);
-$router->post('/settings/gcash-brackets', [SettingsController::class, 'storeGcashBracket'], [$auth, $ownerOnly, $csrf]);
-$router->post('/settings/gcash-brackets/{id}/delete', [SettingsController::class, 'deleteGcashBracket'], [$auth, $ownerOnly, $csrf]);
-$router->get('/settings/expense-categories', [SettingsController::class, 'expenseCategories'], [$auth, $ownerOnly]);
-$router->post('/settings/expense-categories', [SettingsController::class, 'storeExpenseCategory'], [$auth, $ownerOnly, $csrf]);
-$router->post('/settings/expense-categories/{id}/delete', [SettingsController::class, 'deleteExpenseCategory'], [$auth, $ownerOnly, $csrf]);
-$router->post('/settings/security', [SettingsController::class, 'updateSecurity'], [$auth, $ownerOnly, $csrf]);
-$router->get('/settings/backup', [SettingsController::class, 'downloadBackup'], [$auth, $ownerOnly]);
+// -- Settings / Feature Management --------------------------------------------
+$router->get('/settings', [SettingsController::class, 'index'], [$auth, $perm('settings', 'manage')]);
+$router->post('/settings/general', [SettingsController::class, 'updateGeneral'], [$auth, $perm('settings', 'manage'), $csrf]);
+$router->get('/settings/features', [SettingsController::class, 'features'], [$auth, $perm('settings', 'manage')]);
+$router->post('/settings/features', [SettingsController::class, 'updateFeatures'], [$auth, $perm('settings', 'manage'), $csrf]);
+$router->get('/settings/payment-methods', [SettingsController::class, 'paymentMethods'], [$auth, $perm('settings', 'manage')]);
+$router->post('/settings/payment-methods', [SettingsController::class, 'updatePaymentMethods'], [$auth, $perm('settings', 'manage'), $csrf]);
+$router->get('/settings/networks', [SettingsController::class, 'networks'], [$auth, $perm('settings', 'manage')]);
+$router->post('/settings/networks', [SettingsController::class, 'storeNetwork'], [$auth, $perm('settings', 'manage'), $csrf]);
+$router->post('/settings/networks/{id}/toggle', [SettingsController::class, 'toggleNetwork'], [$auth, $perm('settings', 'manage'), $csrf]);
+$router->get('/settings/gcash-brackets', [SettingsController::class, 'gcashBrackets'], [$auth, $perm('settings', 'manage')]);
+$router->post('/settings/gcash-brackets', [SettingsController::class, 'storeGcashBracket'], [$auth, $perm('settings', 'manage'), $csrf]);
+$router->post('/settings/gcash-brackets/{id}/delete', [SettingsController::class, 'deleteGcashBracket'], [$auth, $perm('settings', 'manage'), $csrf]);
+$router->get('/settings/expense-categories', [SettingsController::class, 'expenseCategories'], [$auth, $perm('settings', 'manage')]);
+$router->post('/settings/expense-categories', [SettingsController::class, 'storeExpenseCategory'], [$auth, $perm('settings', 'manage'), $csrf]);
+$router->post('/settings/expense-categories/{id}/delete', [SettingsController::class, 'deleteExpenseCategory'], [$auth, $perm('settings', 'manage'), $csrf]);
+$router->post('/settings/security', [SettingsController::class, 'updateSecurity'], [$auth, $perm('settings', 'manage'), $csrf]);
+$router->get('/settings/backup', [SettingsController::class, 'downloadBackup'], [$auth, $perm('settings', 'manage')]);
 
-// -- Audit log (owner only) ---------------------------------------------------
-$router->get('/audit-log', [AuditController::class, 'index'], [$auth, $ownerOnly]);
+// -- Audit log -----------------------------------------------------------------
+$router->get('/audit-log', [AuditController::class, 'index'], [$auth, $perm('audit_log', 'view')]);

@@ -8,8 +8,10 @@
 /** @var string $filter */
 /** @var int $page */
 /** @var int $totalPages */
-$role = $currentUser['role_key'] ?? null;
-$canManage = in_array($role, ['owner', 'manager'], true);
+$canAdd = can('inventory', 'add');
+$canEdit = can('inventory', 'edit');
+$canDelete = can('inventory', 'delete');
+$canManage = $canAdd || $canEdit || $canDelete;
 
 function stock_badge(array $p): string
 {
@@ -25,10 +27,14 @@ function stock_badge(array $p): string
     </div>
     <?php if ($canManage): ?>
     <div class="flex gap-8">
+        <?php if ($canEdit): ?>
         <button type="button" class="btn btn-outline" data-modal-target="#import-modal"><?= icon('archive', 16) ?> Import</button>
         <a href="<?= url('/inventory/export.csv?' . http_build_query(['q' => $search])) ?>" class="btn btn-outline"><?= icon('reports', 16) ?> Export</a>
         <a href="<?= url('/inventory/labels') ?>" class="btn btn-outline" target="_blank"><?= icon('barcode', 16) ?> Print Labels</a>
+        <?php endif; ?>
+        <?php if ($canAdd): ?>
         <a href="<?= url('/inventory/create') ?>" class="btn btn-primary"><?= icon('plus', 16) ?> Add Product</a>
+        <?php endif; ?>
     </div>
     <?php endif; ?>
 </div>
@@ -93,13 +99,19 @@ function stock_badge(array $p): string
                     <?php if ($canManage): ?>
                     <td>
                         <div class="flex gap-8">
+                            <?php if ($canEdit): ?>
                             <a href="<?= url('/inventory/' . $p['id'] . '/edit') ?>" class="btn btn-sm btn-outline"><?= icon('edit', 14) ?></a>
+                            <?php endif; ?>
+                            <?php if ($canDelete): ?>
                             <form method="post" action="<?= url('/inventory/' . $p['id'] . '/archive') ?>" onsubmit="return confirm('<?= $p['status'] === 'active' ? 'Archive' : 'Restore' ?> this product?');">
                                 <?= csrf_field() ?>
                                 <button type="submit" class="btn btn-sm btn-outline"><?= icon('archive', 14) ?></button>
                             </form>
+                            <?php endif; ?>
+                            <?php if ($canEdit): ?>
                             <button type="button" class="btn btn-sm btn-outline" data-modal-target="#adjust-<?= $p['id'] ?>"><?= icon('barcode', 14) ?></button>
                             <a href="<?= url('/inventory/labels?ids=' . $p['id']) ?>" class="btn btn-sm btn-outline" target="_blank" title="Print Label"><?= icon('reports', 14) ?></a>
+                            <?php endif; ?>
                         </div>
                     </td>
                     <?php endif; ?>
@@ -118,7 +130,7 @@ function stock_badge(array $p): string
     <?php endif; ?>
 </div>
 
-<?php if ($canManage): ?>
+<?php if ($canEdit): ?>
 <div class="modal-backdrop" id="import-modal">
     <div class="modal">
         <h3>Import Products</h3>
