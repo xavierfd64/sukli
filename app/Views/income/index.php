@@ -1,6 +1,8 @@
 <?php
 /** @var array $sources */
 /** @var float $totalIncome */
+/** @var int $utangCollectedCount */
+/** @var float $utangCollectedTotal */
 /** @var string $from */
 /** @var string $to */
 ?>
@@ -46,6 +48,29 @@
                     <td style="font-weight:700;color:var(--blue);"><?= money($totalIncome) ?></td>
                 </tr>
             </tfoot>
+        </table>
+    </div>
+</div>
+
+<div class="card mt-16">
+    <div class="table-wrap">
+        <table class="table">
+            <thead><tr><th>Cash Flow (not part of Total Income)</th><th>Transactions</th><th>Amount</th></tr></thead>
+            <tbody>
+                <tr>
+                    <td>
+                        <strong>Utang Payments Collected</strong>
+                        <div class="text-muted" style="font-size:11.5px;">
+                            Cash received against outstanding Utang balances. The related sale was already
+                            counted under "Utang Sales" when it was made, so this collection is shown here
+                            for cash-flow visibility only and is <strong>not</strong> added to Total Income —
+                            counting it again would double-count that sale.
+                        </div>
+                    </td>
+                    <td class="text-muted"><?= $utangCollectedCount ?></td>
+                    <td style="font-weight:600;"><?= money($utangCollectedTotal) ?></td>
+                </tr>
+            </tbody>
         </table>
     </div>
 </div>
