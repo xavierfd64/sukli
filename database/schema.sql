@@ -24,6 +24,7 @@ CREATE TABLE IF NOT EXISTS stores (
     name VARCHAR(150) NOT NULL,
     address VARCHAR(255) NULL,
     phone VARCHAR(50) NULL,
+    logo_path VARCHAR(255) NULL,
     currency_code VARCHAR(3) NOT NULL DEFAULT 'PHP',
     currency_symbol VARCHAR(5) NOT NULL DEFAULT '₱',
     timezone VARCHAR(64) NOT NULL DEFAULT 'Asia/Manila',

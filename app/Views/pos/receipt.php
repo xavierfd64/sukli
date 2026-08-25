@@ -4,6 +4,10 @@
 /** @var array $payments */
 /** @var array $store */
 /** @var bool $autoPrintReceipt */
+/** @var string $receiptHeader */
+/** @var bool $receiptShowAddress */
+/** @var bool $receiptShowPhone */
+/** @var bool $receiptShowLogo */
 $customerName = trim(($sale['customer_first_name'] ?? '') . ' ' . ($sale['customer_last_name'] ?? ''));
 $methodLabels = [
     'cash' => 'Cash', 'gcash' => 'GCash', 'utang' => 'Utang',
@@ -20,8 +24,12 @@ $methodLabels = [
 
 <div class="card" style="max-width:420px;" id="receipt-print">
     <div style="text-align:center;margin-bottom:14px;">
-        <strong style="font-size:16px;"><?= e($store['name'] ?? 'Sukli Store') ?></strong>
-        <div class="text-muted" style="font-size:12px;"><?= e($store['address'] ?? '') ?></div>
+        <?php if ($receiptShowLogo && !empty($store['logo_path'])): ?>
+            <img src="<?= e(\Sukli\Services\UploadService::url($store['logo_path'])) ?>" alt="" style="width:44px;height:44px;object-fit:cover;border-radius:8px;margin-bottom:6px;">
+        <?php endif; ?>
+        <div><strong style="font-size:16px;"><?= e($receiptHeader ?: ($store['name'] ?? 'Sukli Store')) ?></strong></div>
+        <?php if ($receiptShowAddress && !empty($store['address'])): ?><div class="text-muted" style="font-size:12px;"><?= e($store['address']) ?></div><?php endif; ?>
+        <?php if ($receiptShowPhone && !empty($store['phone'])): ?><div class="text-muted" style="font-size:12px;"><?= e($store['phone']) ?></div><?php endif; ?>
     </div>
     <div style="font-size:12.5px;margin-bottom:10px;">
         <div class="flex justify-between"><span>Receipt No.</span><span>#<?= e($sale['sale_number']) ?></span></div>

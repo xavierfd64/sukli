@@ -4,6 +4,10 @@
 /** @var array $summary */
 /** @var string $phpVersion */
 /** @var bool $autoPrintReceipt */
+/** @var string $receiptHeader */
+/** @var bool $receiptShowAddress */
+/** @var bool $receiptShowPhone */
+/** @var bool $receiptShowLogo */
 ?>
 <h2 style="margin-top:0;">Settings</h2>
 <p class="text-muted">Manage your store, system preferences and more.</p>
@@ -63,9 +67,23 @@
 
     <div class="card mb-16">
         <div class="card-title">General Settings</div>
-        <div class="card-subtitle">Store information, business preferences, receipt footer</div>
-        <form method="post" action="<?= url('/settings/general') ?>">
+        <div class="card-subtitle">Business logo, store information and preferences</div>
+        <form method="post" action="<?= url('/settings/general') ?>" enctype="multipart/form-data">
             <?= csrf_field() ?>
+            <div class="form-group">
+                <label>Business Logo</label>
+                <div class="flex items-center gap-16">
+                    <?php if (!empty($store['logo_path'])): ?>
+                        <img src="<?= e(\Sukli\Services\UploadService::url($store['logo_path'])) ?>" alt="" class="product-thumb product-thumb-lg">
+                    <?php else: ?>
+                        <div class="product-thumb product-thumb-lg product-thumb-placeholder">NO LOGO</div>
+                    <?php endif; ?>
+                    <div style="flex:1;">
+                        <input class="form-control" type="file" name="logo" accept="image/jpeg,image/png,image/webp">
+                        <div class="form-hint">JPG, PNG or WEBP — max 5MB.</div>
+                    </div>
+                </div>
+            </div>
             <div class="form-row">
                 <div class="form-group"><label>Store Name</label><input class="form-control" name="name" value="<?= e($store['name']) ?>" required></div>
                 <div class="form-group"><label>Phone</label><input class="form-control" name="phone" value="<?= e($store['phone'] ?? '') ?>"></div>
@@ -84,13 +102,79 @@
                 </select>
                 <div class="form-hint">Used for "today", reports, and all recorded timestamps throughout Sukli.</div>
             </div>
-            <div class="form-group"><label>Receipt Footer</label><input class="form-control" name="receipt_footer" value="<?= e($store['receipt_footer'] ?? '') ?>"></div>
-            <label class="flex items-center gap-8 mb-16" style="font-weight:500;">
-                <input type="checkbox" name="auto_print_receipt" value="1" <?= $autoPrintReceipt ? 'checked' : '' ?> style="width:18px;height:18px;">
-                Auto Print Receipt after checkout
-            </label>
             <button type="submit" class="btn btn-primary">Save General Settings</button>
         </form>
+    </div>
+
+    <div class="card mb-16">
+        <div class="card-title">Receipt Customization</div>
+        <div class="card-subtitle">What prints on every POS receipt — edit and watch the preview update</div>
+        <div class="grid grid-2" style="align-items:start;gap:20px;">
+            <form method="post" action="<?= url('/settings/receipt') ?>" id="receipt-form">
+                <?= csrf_field() ?>
+                <div class="form-group"><label>Receipt Header</label><input class="form-control" id="rc-header" name="receipt_header" value="<?= e($receiptHeader) ?>" placeholder="Defaults to your Store Name"></div>
+                <div class="form-group"><label>Receipt Footer</label><input class="form-control" id="rc-footer" name="receipt_footer" value="<?= e($store['receipt_footer'] ?? '') ?>"></div>
+                <label class="flex items-center gap-8 mb-8" style="font-weight:500;">
+                    <input type="checkbox" id="rc-show-logo" name="receipt_show_logo" value="1" <?= $receiptShowLogo ? 'checked' : '' ?> style="width:18px;height:18px;">
+                    Show Logo on Receipt
+                </label>
+                <label class="flex items-center gap-8 mb-8" style="font-weight:500;">
+                    <input type="checkbox" id="rc-show-address" name="receipt_show_address" value="1" <?= $receiptShowAddress ? 'checked' : '' ?> style="width:18px;height:18px;">
+                    Show Address on Receipt
+                </label>
+                <label class="flex items-center gap-8 mb-8" style="font-weight:500;">
+                    <input type="checkbox" id="rc-show-phone" name="receipt_show_phone" value="1" <?= $receiptShowPhone ? 'checked' : '' ?> style="width:18px;height:18px;">
+                    Show Phone on Receipt
+                </label>
+                <label class="flex items-center gap-8 mb-16" style="font-weight:500;">
+                    <input type="checkbox" name="auto_print_receipt" value="1" <?= $autoPrintReceipt ? 'checked' : '' ?> style="width:18px;height:18px;">
+                    Auto Print Receipt after checkout
+                </label>
+                <button type="submit" class="btn btn-primary btn-block">Save Receipt Settings</button>
+            </form>
+
+            <div>
+                <div class="text-muted" style="font-size:11px;font-weight:700;text-transform:uppercase;margin-bottom:8px;">Live Preview</div>
+                <div class="card" style="max-width:280px;background:#fafafa;">
+                    <div style="text-align:center;margin-bottom:12px;">
+                        <img src="<?= !empty($store['logo_path']) ? e(\Sukli\Services\UploadService::url($store['logo_path'])) : '' ?>" alt=""
+                             id="rc-preview-logo" data-has-logo="<?= !empty($store['logo_path']) ? '1' : '0' ?>"
+                             style="width:40px;height:40px;object-fit:cover;border-radius:8px;margin-bottom:6px;<?= ($receiptShowLogo && !empty($store['logo_path'])) ? '' : 'display:none;' ?>">
+                        <div id="rc-preview-header" style="font-weight:700;font-size:14px;"><?= e($receiptHeader ?: $store['name']) ?></div>
+                        <div id="rc-preview-address" style="font-size:11px;color:var(--text-muted);<?= $receiptShowAddress ? '' : 'display:none;' ?>"><?= e($store['address'] ?? '') ?></div>
+                        <div id="rc-preview-phone" style="font-size:11px;color:var(--text-muted);<?= $receiptShowPhone ? '' : 'display:none;' ?>"><?= e($store['phone'] ?? '') ?></div>
+                    </div>
+                    <div style="border-top:1px dashed var(--border);border-bottom:1px dashed var(--border);padding:8px 0;margin-bottom:8px;font-size:11px;">
+                        <div class="flex justify-between"><span>1x Sample Item</span><span><?= money(50) ?></span></div>
+                    </div>
+                    <div style="font-size:11px;font-weight:700;display:flex;justify-content:space-between;margin-bottom:10px;">
+                        <span>Total</span><span><?= money(50) ?></span>
+                    </div>
+                    <div id="rc-preview-footer" style="text-align:center;font-size:11px;color:var(--text-muted);"><?= e($store['receipt_footer'] ?? '') ?></div>
+                </div>
+            </div>
+        </div>
+        <script>
+        (function () {
+            var header = document.getElementById('rc-header');
+            var footer = document.getElementById('rc-footer');
+            var showLogo = document.getElementById('rc-show-logo');
+            var showAddress = document.getElementById('rc-show-address');
+            var showPhone = document.getElementById('rc-show-phone');
+            var pHeader = document.getElementById('rc-preview-header');
+            var pFooter = document.getElementById('rc-preview-footer');
+            var pLogo = document.getElementById('rc-preview-logo');
+            var pAddress = document.getElementById('rc-preview-address');
+            var pPhone = document.getElementById('rc-preview-phone');
+            var storeName = <?= json_encode($store['name']) ?>;
+
+            header.addEventListener('input', function () { pHeader.textContent = header.value || storeName; });
+            footer.addEventListener('input', function () { pFooter.textContent = footer.value; });
+            showLogo.addEventListener('change', function () { pLogo.style.display = (showLogo.checked && pLogo.getAttribute('data-has-logo') === '1') ? '' : 'none'; });
+            showAddress.addEventListener('change', function () { pAddress.style.display = showAddress.checked ? '' : 'none'; });
+            showPhone.addEventListener('change', function () { pPhone.style.display = showPhone.checked ? '' : 'none'; });
+        })();
+        </script>
     </div>
 
     <div class="card mb-16">

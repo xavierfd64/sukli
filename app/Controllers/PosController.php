@@ -232,6 +232,10 @@ class PosController extends Controller
             'payments' => $payments,
             'store' => $store,
             'autoPrintReceipt' => SystemSettingsService::getBool((int) $storeId, 'auto_print_receipt'),
+            'receiptHeader' => SystemSettingsService::get((int) $storeId, 'receipt_header') ?? '',
+            'receiptShowAddress' => SystemSettingsService::getBool((int) $storeId, 'receipt_show_address', true),
+            'receiptShowPhone' => SystemSettingsService::getBool((int) $storeId, 'receipt_show_phone', true),
+            'receiptShowLogo' => SystemSettingsService::getBool((int) $storeId, 'receipt_show_logo', true),
         ]);
     }
 }

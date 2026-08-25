@@ -17,6 +17,7 @@ use Sukli\Services\NetworkService;
 use Sukli\Services\PaymentMethodService;
 use Sukli\Services\SystemSettingsService;
 use Sukli\Services\TimezoneService;
+use Sukli\Services\UploadService;
 
 class SettingsController extends Controller
 {
@@ -42,6 +43,10 @@ class SettingsController extends Controller
             'phpVersion' => PHP_VERSION,
             'timezones' => TimezoneService::all(),
             'autoPrintReceipt' => SystemSettingsService::getBool((int) $storeId, 'auto_print_receipt'),
+            'receiptHeader' => SystemSettingsService::get((int) $storeId, 'receipt_header') ?? '',
+            'receiptShowAddress' => SystemSettingsService::getBool((int) $storeId, 'receipt_show_address', true),
+            'receiptShowPhone' => SystemSettingsService::getBool((int) $storeId, 'receipt_show_phone', true),
+            'receiptShowLogo' => SystemSettingsService::getBool((int) $storeId, 'receipt_show_logo', true),
         ]);
     }
 
@@ -55,20 +60,55 @@ class SettingsController extends Controller
             $timezone = $existing['timezone'] ?? 'Asia/Manila';
         }
 
+        $logoPath = $existing['logo_path'];
+        try {
+            $uploaded = UploadService::store($request->file('logo'), 'logos/' . $storeId);
+            if ($uploaded) {
+                UploadService::delete($logoPath);
+                $logoPath = $uploaded;
+            }
+        } catch (\RuntimeException $e) {
+            Session::flash('error', $e->getMessage());
+            $this->redirect('/settings');
+        }
+
         Database::execute(
-            "UPDATE stores SET name=?, address=?, phone=?, currency_symbol=?, tax_rate=?, receipt_footer=?, timezone=?, updated_at=NOW() WHERE id = ?",
+            "UPDATE stores SET name=?, address=?, phone=?, logo_path=?, currency_symbol=?, tax_rate=?, timezone=?, updated_at=NOW() WHERE id = ?",
             [
                 $request->trimmed('name'), $request->trimmed('address') ?: null, $request->trimmed('phone') ?: null,
-                $request->trimmed('currency_symbol') ?: '₱', (float) $request->input('tax_rate', 0),
-                $request->trimmed('receipt_footer') ?: null, $timezone, $storeId,
+                $logoPath, $request->trimmed('currency_symbol') ?: '₱', (float) $request->input('tax_rate', 0),
+                $timezone, $storeId,
             ]
         );
 
-        $autoPrint = $request->input('auto_print_receipt') === '1';
-        SystemSettingsService::set((int) $storeId, 'auto_print_receipt', $autoPrint ? '1' : '0');
-
-        AuditService::log('update', 'settings', 'store', $storeId, $existing, $request->only(['name', 'address', 'phone', 'currency_symbol', 'tax_rate', 'receipt_footer', 'timezone']) + ['auto_print_receipt' => $autoPrint]);
+        AuditService::log('update', 'settings', 'store', $storeId, $existing, $request->only(['name', 'address', 'phone', 'currency_symbol', 'tax_rate', 'timezone']));
         Session::flash('success', 'Store settings updated.');
+        $this->redirect('/settings');
+    }
+
+    public function updateReceipt(Request $request): void
+    {
+        $storeId = (int) Auth::storeId();
+        $existing = Database::one("SELECT receipt_footer FROM stores WHERE id = ?", [$storeId]);
+
+        Database::execute(
+            "UPDATE stores SET receipt_footer = ?, updated_at = NOW() WHERE id = ?",
+            [$request->trimmed('receipt_footer') ?: null, $storeId]
+        );
+
+        $values = [
+            'receipt_header' => $request->trimmed('receipt_header') ?? '',
+            'receipt_show_address' => $request->input('receipt_show_address') === '1' ? '1' : '0',
+            'receipt_show_phone' => $request->input('receipt_show_phone') === '1' ? '1' : '0',
+            'receipt_show_logo' => $request->input('receipt_show_logo') === '1' ? '1' : '0',
+            'auto_print_receipt' => $request->input('auto_print_receipt') === '1' ? '1' : '0',
+        ];
+        foreach ($values as $key => $value) {
+            SystemSettingsService::set($storeId, $key, $value);
+        }
+
+        AuditService::log('update', 'settings', 'receipt', $storeId, $existing, $values + ['receipt_footer' => $request->trimmed('receipt_footer')]);
+        Session::flash('success', 'Receipt settings updated.');
         $this->redirect('/settings');
     }
 
