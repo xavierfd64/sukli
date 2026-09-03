@@ -56,6 +56,7 @@ class Auth
         Session::put('store_id', $user['store_id'] !== null ? (int) $user['store_id'] : null);
         Session::put('role_key', $user['role_key']);
         Session::put('role_id', (int) $user['role_id']);
+        Session::put('is_platform_admin', (bool) $user['is_platform_admin']);
 
         return ['ok' => true, 'user' => $user];
     }
@@ -93,6 +94,11 @@ class Auth
     public static function roleId(): ?int
     {
         return Session::get('role_id');
+    }
+
+    public static function isPlatformAdmin(): bool
+    {
+        return (bool) Session::get('is_platform_admin', false);
     }
 
     public static function hasRole(array $roles): bool

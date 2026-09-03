@@ -18,6 +18,7 @@ use Sukli\Controllers\PosController;
 use Sukli\Controllers\ReportController;
 use Sukli\Controllers\RoleController;
 use Sukli\Controllers\SettingsController;
+use Sukli\Controllers\SubscriptionController;
 use Sukli\Controllers\SupplierController;
 use Sukli\Controllers\UserController;
 use Sukli\Controllers\UtangController;
@@ -28,6 +29,7 @@ use Sukli\Middleware\GuestMiddleware;
 use Sukli\Middleware\PermissionMiddleware;
 
 $auth = AuthMiddleware::handle();
+$authOnly = AuthMiddleware::authOnly();
 $guest = GuestMiddleware::handle();
 $csrf = CsrfMiddleware::handle();
 $eloadOn = FeatureMiddleware::require('eload');
@@ -58,7 +60,11 @@ $router->post('/install/api/finalize', [InstallController::class, 'apiFinalize']
 $router->get('/', [DashboardController::class, 'index'], [$auth]);
 $router->get('/login', [AuthController::class, 'showLogin'], [$guest]);
 $router->post('/login', [AuthController::class, 'login'], [$guest, $csrf]);
-$router->post('/logout', [AuthController::class, 'logout'], [$auth, $csrf]);
+$router->post('/logout', [AuthController::class, 'logout'], [$authOnly, $csrf]);
+
+// -- Subscription / Billing (always reachable once logged in, even expired) --
+$router->get('/subscription', [SubscriptionController::class, 'index'], [$authOnly]);
+$router->post('/subscription/payments', [SubscriptionController::class, 'storePayment'], [$authOnly, $csrf]);
 
 // -- Dashboard ------------------------------------------------------------
 $router->get('/dashboard', [DashboardController::class, 'index'], [$auth]);
