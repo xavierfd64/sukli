@@ -151,6 +151,33 @@ class SubscriptionService
         Database::execute("UPDATE subscriptions SET subscription_plan_id = ? WHERE id = ?", [$planId, $subscriptionId]);
     }
 
+    /** Approving a subscription_payments row moves the subscription to that payment's plan and extends it by one full billing period from it — the only path that turns a 'pending' payment into actual access. */
+    public static function approvePaymentAndRenew(int $subscriptionId, int $planId, string $billingPeriod): void
+    {
+        self::changePlan($subscriptionId, $planId);
+        self::extend($subscriptionId, $billingPeriod === 'yearly' ? 365 : 30);
+    }
+
+    /** Platform Admin manually restoring access (e.g. after resolving a support issue) without waiting for a new payment. Does not touch current_period_end — if it's already in the past, the next reconcileStatus() call will flip this straight back to expired, which is the correct behavior for "give them a look, not a free period." */
+    public static function reactivate(int $subscriptionId): void
+    {
+        Database::execute("UPDATE subscriptions SET status = 'active' WHERE id = ?", [$subscriptionId]);
+    }
+
+    /**
+     * Bulk version of the same self-healing reconcileStatus() does per-row,
+     * for a Platform Admin dashboard that needs accurate counts across
+     * every organization at once rather than one lazy fix-up per visit.
+     */
+    public static function reconcileAll(): void
+    {
+        Database::execute(
+            "UPDATE subscriptions SET status = 'expired'
+             WHERE (status = 'trial' AND trial_ends_at IS NOT NULL AND trial_ends_at < NOW())
+                OR (status = 'active' AND current_period_end IS NOT NULL AND current_period_end < NOW())"
+        );
+    }
+
     /** Self-heals a stale status: a trial/active row whose end date has already passed becomes 'expired' the moment anything looks at it. */
     private static function reconcileStatus(array &$row): void
     {

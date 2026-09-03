@@ -63,6 +63,11 @@
         <?php if (can('settings', 'manage')): ?>
         <a href="<?= url('/settings') ?>" class="<?= (str_starts_with($currentPath, '/settings') ? 'is-active' : '') ?>"><?= icon('settings') ?> Settings</a>
         <?php endif; ?>
+
+        <?php if (!empty($currentUser['is_platform_admin'])): ?>
+        <div class="nav-section-label">Platform</div>
+        <a href="<?= url('/platform-admin') ?>" class="<?= (str_starts_with($currentPath, '/platform-admin') ? 'is-active' : '') ?>"><?= icon('dashboard') ?> Platform Admin</a>
+        <?php endif; ?>
     </nav>
     <div class="sidebar-foot">
         <form method="post" action="<?= url('/logout') ?>">

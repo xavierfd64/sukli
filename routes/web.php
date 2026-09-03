@@ -15,6 +15,7 @@ use Sukli\Controllers\GcashController;
 use Sukli\Controllers\IncomeController;
 use Sukli\Controllers\InstallController;
 use Sukli\Controllers\InventoryController;
+use Sukli\Controllers\PlatformAdminController;
 use Sukli\Controllers\PosController;
 use Sukli\Controllers\RegistrationController;
 use Sukli\Controllers\ReportController;
@@ -29,11 +30,13 @@ use Sukli\Middleware\CsrfMiddleware;
 use Sukli\Middleware\FeatureMiddleware;
 use Sukli\Middleware\GuestMiddleware;
 use Sukli\Middleware\PermissionMiddleware;
+use Sukli\Middleware\PlatformAdminMiddleware;
 
 $auth = AuthMiddleware::handle();
 $authOnly = AuthMiddleware::authOnly();
 $guest = GuestMiddleware::handle();
 $csrf = CsrfMiddleware::handle();
+$platformAdmin = PlatformAdminMiddleware::handle();
 $eloadOn = FeatureMiddleware::require('eload');
 $gcashOn = FeatureMiddleware::require('gcash');
 $utangOn = FeatureMiddleware::require('utang');
@@ -177,3 +180,19 @@ $router->get('/settings/backup', [SettingsController::class, 'downloadBackup'], 
 
 // -- Audit log -----------------------------------------------------------------
 $router->get('/audit-log', [AuditController::class, 'index'], [$auth, $perm('audit_log', 'view')]);
+
+// -- Platform Admin (gated by Auth::isPlatformAdmin(), not org-scoped) --------
+$router->get('/platform-admin', [PlatformAdminController::class, 'dashboard'], [$platformAdmin]);
+$router->get('/platform-admin/organizations', [PlatformAdminController::class, 'organizations'], [$platformAdmin]);
+$router->get('/platform-admin/plans', [PlatformAdminController::class, 'plans'], [$platformAdmin]);
+$router->post('/platform-admin/plans', [PlatformAdminController::class, 'storePlan'], [$platformAdmin, $csrf]);
+$router->post('/platform-admin/plans/{id}/toggle', [PlatformAdminController::class, 'togglePlan'], [$platformAdmin, $csrf]);
+$router->post('/platform-admin/plans/{id}', [PlatformAdminController::class, 'updatePlan'], [$platformAdmin, $csrf]);
+$router->get('/platform-admin/payments', [PlatformAdminController::class, 'payments'], [$platformAdmin]);
+$router->post('/platform-admin/payments/{id}/approve', [PlatformAdminController::class, 'approvePayment'], [$platformAdmin, $csrf]);
+$router->post('/platform-admin/payments/{id}/reject', [PlatformAdminController::class, 'rejectPayment'], [$platformAdmin, $csrf]);
+$router->get('/platform-admin/settings', [PlatformAdminController::class, 'settings'], [$platformAdmin]);
+$router->post('/platform-admin/settings', [PlatformAdminController::class, 'updateSettings'], [$platformAdmin, $csrf]);
+$router->post('/platform-admin/organizations/{id}/suspend', [PlatformAdminController::class, 'suspendOrganization'], [$platformAdmin, $csrf]);
+$router->post('/platform-admin/organizations/{id}/reactivate', [PlatformAdminController::class, 'reactivateOrganization'], [$platformAdmin, $csrf]);
+$router->get('/platform-admin/organizations/{id}', [PlatformAdminController::class, 'organizationDetail'], [$platformAdmin]);
