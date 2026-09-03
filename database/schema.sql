@@ -11,17 +11,28 @@ SET FOREIGN_KEY_CHECKS = 0;
 -- Organizations / Stores
 -- ---------------------------------------------------------------------------
 
+-- An organization is a SaaS tenant (one customer business). Subscription
+-- state (trial/active/expired/...) deliberately does NOT live here — it
+-- lives entirely in `subscriptions`, so there is exactly one place that
+-- tracks it instead of two copies that could drift out of sync.
 CREATE TABLE IF NOT EXISTS organizations (
     id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     name VARCHAR(150) NOT NULL,
+    slug VARCHAR(80) NULL,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uq_organizations_slug (slug)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- A `store` row is a branch of its organization — the multi-branch feature
+-- needed no schema redesign, only these two extra columns, because every
+-- store-scoped table already carries store_id (see file header).
 CREATE TABLE IF NOT EXISTS stores (
     id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     organization_id INT UNSIGNED NOT NULL,
     name VARCHAR(150) NOT NULL,
+    branch_code VARCHAR(30) NULL,
+    is_main_branch TINYINT(1) NOT NULL DEFAULT 0,
     address VARCHAR(255) NULL,
     phone VARCHAR(50) NULL,
     logo_path VARCHAR(255) NULL,
@@ -88,6 +99,9 @@ CREATE TABLE IF NOT EXISTS users (
     email VARCHAR(150) NULL,
     password_hash VARCHAR(255) NOT NULL,
     status ENUM('active','inactive') NOT NULL DEFAULT 'active',
+    -- Platform Super Admin: independent of any organization/role — a flag,
+    -- not a role, since platform admins aren't scoped to a single tenant.
+    is_platform_admin TINYINT(1) NOT NULL DEFAULT 0,
     last_login_at DATETIME NULL,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -117,6 +131,100 @@ CREATE TABLE IF NOT EXISTS login_attempts (
     attempted_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     KEY idx_login_attempts_username_time (username, attempted_at),
     KEY idx_login_attempts_ip_time (ip_address, attempted_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ---------------------------------------------------------------------------
+-- SaaS / Subscriptions
+-- ---------------------------------------------------------------------------
+
+-- Database-driven plan catalog — Platform Admin edits these; nothing in the
+-- app hardcodes plan names, prices, or limits. NULL on any max_* column
+-- means unlimited for that resource. `features` is a JSON array of module
+-- keys the plan grants (e.g. ["pos","inventory","eload"]); NULL means all
+-- modules the store itself has enabled (see FeatureService) are allowed —
+-- the plan can only restrict, never re-enable something the store turned
+-- off in its own Feature Management.
+CREATE TABLE IF NOT EXISTS subscription_plans (
+    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    slug VARCHAR(40) NOT NULL,
+    name VARCHAR(80) NOT NULL,
+    description VARCHAR(255) NULL,
+    monthly_price DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+    yearly_price DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+    max_branches SMALLINT UNSIGNED NULL,
+    max_users SMALLINT UNSIGNED NULL,
+    max_products INT UNSIGNED NULL,
+    max_transactions_per_month INT UNSIGNED NULL,
+    features TEXT NULL,
+    is_active TINYINT(1) NOT NULL DEFAULT 1,
+    sort_order SMALLINT UNSIGNED NOT NULL DEFAULT 0,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uq_subscription_plans_slug (slug)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- One row per organization's current (or most recent) subscription period.
+-- Renewing/upgrading updates this same row (see SubscriptionService) rather
+-- than inserting a new one — subscription_payments is the historical
+-- ledger; this table only needs to answer "what is this org allowed right
+-- now," so keeping it to one live row per org keeps that check a single
+-- indexed lookup, not an aggregate over history.
+CREATE TABLE IF NOT EXISTS subscriptions (
+    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    organization_id INT UNSIGNED NOT NULL,
+    subscription_plan_id INT UNSIGNED NOT NULL,
+    billing_period ENUM('trial','monthly','yearly') NOT NULL DEFAULT 'trial',
+    status ENUM('trial','active','expired','suspended','cancelled') NOT NULL DEFAULT 'trial',
+    trial_ends_at DATETIME NULL,
+    current_period_start DATETIME NULL,
+    current_period_end DATETIME NULL,
+    cancelled_at DATETIME NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uq_subscriptions_organization (organization_id),
+    KEY idx_subscriptions_status (status),
+    CONSTRAINT fk_subscriptions_org FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE CASCADE,
+    CONSTRAINT fk_subscriptions_plan FOREIGN KEY (subscription_plan_id) REFERENCES subscription_plans(id) ON DELETE RESTRICT
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- A proof-of-payment submission queue (GCash/bank transfer/other manual
+-- methods) — never auto-approved. Platform Admin approves or rejects;
+-- approving is what actually extends the subscription (see
+-- SubscriptionService::approvePayment). proof_path follows the same
+-- centralized upload path as every other file in the app (UploadService).
+CREATE TABLE IF NOT EXISTS subscription_payments (
+    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    organization_id INT UNSIGNED NOT NULL,
+    subscription_id INT UNSIGNED NOT NULL,
+    subscription_plan_id INT UNSIGNED NOT NULL,
+    billing_period ENUM('monthly','yearly') NOT NULL,
+    amount DECIMAL(10,2) NOT NULL,
+    payment_method VARCHAR(30) NOT NULL,
+    reference_no VARCHAR(100) NULL,
+    proof_path VARCHAR(255) NULL,
+    status ENUM('pending','approved','rejected','cancelled') NOT NULL DEFAULT 'pending',
+    submitted_by INT UNSIGNED NULL,
+    reviewed_by INT UNSIGNED NULL,
+    reviewed_at DATETIME NULL,
+    notes VARCHAR(255) NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    KEY idx_sub_payments_org_status (organization_id, status),
+    CONSTRAINT fk_sub_payments_org FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE CASCADE,
+    CONSTRAINT fk_sub_payments_subscription FOREIGN KEY (subscription_id) REFERENCES subscriptions(id) ON DELETE CASCADE,
+    CONSTRAINT fk_sub_payments_plan FOREIGN KEY (subscription_plan_id) REFERENCES subscription_plans(id) ON DELETE RESTRICT,
+    CONSTRAINT fk_sub_payments_submitted_by FOREIGN KEY (submitted_by) REFERENCES users(id) ON DELETE SET NULL,
+    CONSTRAINT fk_sub_payments_reviewed_by FOREIGN KEY (reviewed_by) REFERENCES users(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Platform-wide configuration (trial length, platform name, support email,
+-- ...) — mirrors system_settings' key/value shape exactly, just without a
+-- store_id since this is platform-scoped, not store-scoped.
+CREATE TABLE IF NOT EXISTS platform_settings (
+    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    setting_key VARCHAR(80) NOT NULL,
+    setting_value TEXT NULL,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uq_platform_settings_key (setting_key)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ---------------------------------------------------------------------------

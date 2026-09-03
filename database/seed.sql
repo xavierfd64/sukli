@@ -182,3 +182,20 @@ INSERT INTO products (store_id, category_id, name, barcode, unit, cost_price, se
     (1, 5, 'Surf Bar 155g', '4800543212345', 'bar', 16.00, 20.00, 6, 5),
     (1, 6, 'Downy Sachet 24ml', '4801112223334', 'sachet', 6.00, 10.00, 3, 5)
 ON DUPLICATE KEY UPDATE selling_price = VALUES(selling_price);
+
+-- Default subscription plan catalog. Every value here is editable later by
+-- Platform Admin (Settings -> Plans) — nothing in the app hardcodes these
+-- names, prices, or limits; this is just a sensible starting point. NULL on
+-- a max_* column means unlimited.
+INSERT INTO subscription_plans (id, slug, name, description, monthly_price, yearly_price, max_branches, max_users, max_products, max_transactions_per_month, is_active, sort_order) VALUES
+    (1, 'trial', 'Free Trial', 'Full access during your trial period.', 0.00, 0.00, 1, 3, 100, 500, 1, 0),
+    (2, 'basic', 'Basic', 'For small single-branch stores.', 499.00, 4990.00, 1, 3, NULL, NULL, 1, 1),
+    (3, 'business', 'Business', 'For growing multi-branch stores.', 1499.00, 14990.00, 5, 15, NULL, NULL, 1, 2),
+    (4, 'enterprise', 'Enterprise', 'For larger businesses at unlimited scale.', 4999.00, 49990.00, NULL, NULL, NULL, NULL, 1, 3)
+ON DUPLICATE KEY UPDATE name = VALUES(name), description = VALUES(description);
+
+-- Platform-wide defaults (Platform Admin can change these).
+INSERT INTO platform_settings (setting_key, setting_value) VALUES
+    ('trial_days', '14'),
+    ('platform_name', 'Sukli')
+ON DUPLICATE KEY UPDATE setting_value = setting_value;
