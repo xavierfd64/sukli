@@ -6,6 +6,7 @@ declare(strict_types=1);
 
 use Sukli\Controllers\AuditController;
 use Sukli\Controllers\AuthController;
+use Sukli\Controllers\BranchController;
 use Sukli\Controllers\CustomerController;
 use Sukli\Controllers\DashboardController;
 use Sukli\Controllers\EloadController;
@@ -65,6 +66,13 @@ $router->post('/logout', [AuthController::class, 'logout'], [$authOnly, $csrf]);
 // -- Subscription / Billing (always reachable once logged in, even expired) --
 $router->get('/subscription', [SubscriptionController::class, 'index'], [$authOnly]);
 $router->post('/subscription/payments', [SubscriptionController::class, 'storePayment'], [$authOnly, $csrf]);
+
+// -- Branches (multi-branch) --------------------------------------------------
+$router->get('/branches', [BranchController::class, 'index'], [$auth, $perm('settings', 'manage')]);
+$router->post('/branches', [BranchController::class, 'store'], [$auth, $perm('settings', 'manage'), $csrf]);
+$router->post('/branches/switch', [BranchController::class, 'switchBranch'], [$auth, $csrf]);
+$router->post('/branches/{id}', [BranchController::class, 'update'], [$auth, $perm('settings', 'manage'), $csrf]);
+$router->post('/branches/{id}/toggle', [BranchController::class, 'toggle'], [$auth, $perm('settings', 'manage'), $csrf]);
 
 // -- Dashboard ------------------------------------------------------------
 $router->get('/dashboard', [DashboardController::class, 'index'], [$auth]);

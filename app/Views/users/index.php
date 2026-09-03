@@ -1,6 +1,8 @@
 <?php
 /** @var array $users */
 /** @var array $roles */
+/** @var array $branches */
+/** @var bool $isOwner */
 ?>
 <div class="flex items-center justify-between mb-16" style="flex-wrap:wrap;gap:10px;">
     <div>
@@ -16,13 +18,14 @@
 <div class="card">
     <div class="table-wrap">
         <table class="table">
-            <thead><tr><th>Name</th><th>Username</th><th>Role</th><th>Status</th><th>Last Login</th><th>Actions</th></tr></thead>
+            <thead><tr><th>Name</th><th>Username</th><th>Role</th><?php if ($isOwner): ?><th>Branch</th><?php endif; ?><th>Status</th><th>Last Login</th><th>Actions</th></tr></thead>
             <tbody>
             <?php foreach ($users as $u): ?>
                 <tr>
                     <td><strong><?= e($u['name']) ?></strong></td>
                     <td class="text-muted"><?= e($u['username']) ?></td>
                     <td><span class="badge badge-blue"><?= e($u['role_name']) ?></span></td>
+                    <?php if ($isOwner): ?><td class="text-muted"><?= e($u['branch_name'] ?? '—') ?></td><?php endif; ?>
                     <td><span class="badge <?= $u['status'] === 'active' ? 'badge-green' : 'badge-gray' ?>"><?= e(ucfirst($u['status'])) ?></span></td>
                     <td class="text-muted"><?= $u['last_login_at'] ? date('M d, Y h:i A', strtotime($u['last_login_at'])) : 'Never' ?></td>
                     <td>
@@ -57,6 +60,13 @@
                     </select>
                 </div>
             </div>
+            <?php if ($isOwner && count($branches) > 1): ?>
+            <div class="form-group"><label>Branch</label>
+                <select class="form-control" name="branch_id">
+                    <?php foreach ($branches as $b): ?><option value="<?= $b['id'] ?>"><?= e($b['name']) ?></option><?php endforeach; ?>
+                </select>
+            </div>
+            <?php endif; ?>
             <div class="form-group"><label>Email (optional)</label><input class="form-control" type="email" name="email"></div>
             <div class="form-group"><label>Password</label><input class="form-control" type="password" name="password" minlength="8" required></div>
             <div class="flex gap-8"><button type="button" class="btn btn-outline btn-block" data-modal-close>Cancel</button><button class="btn btn-primary btn-block">Save</button></div>

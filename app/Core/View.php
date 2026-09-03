@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Sukli\Core;
 
+use Sukli\Services\BranchAccessService;
 use Sukli\Services\FeatureService;
 
 class View
@@ -13,6 +14,25 @@ class View
         $data['currentUser'] = Auth::check() ? Auth::user() : null;
         $data['currentPath'] = (new Request())->path();
         $data['features'] = (Auth::check() && Auth::storeId()) ? FeatureService::all(Auth::storeId()) : [];
+
+        // Available for every view via the topbar branch switcher — computed
+        // once here rather than in every controller. Skipped for Platform
+        // Admins viewing their own account (they may have no organization
+        // context worth switching branches within) and anyone not logged in.
+        $data['branchSwitcherStores'] = [];
+        $data['branchSwitcherCurrent'] = null;
+        if (Auth::check() && Auth::organizationId()) {
+            $stores = BranchAccessService::accessibleStores((int) Auth::id(), (int) Auth::organizationId(), Auth::hasRole(['owner']));
+            if (count($stores) > 1) {
+                $data['branchSwitcherStores'] = $stores;
+                foreach ($stores as $s) {
+                    if ((int) $s['id'] === (int) Auth::storeId()) {
+                        $data['branchSwitcherCurrent'] = $s;
+                        break;
+                    }
+                }
+            }
+        }
 
         $content = self::capture(__DIR__ . "/../Views/{$view}.php", $data);
 

@@ -145,6 +145,13 @@ button { font-family: inherit; cursor: pointer; }
 }
 .hamburger:hover { background: var(--bg); }
 
+.branch-switcher select {
+  height: 36px; border-radius: 8px; border: 1px solid var(--border); background: #fff;
+  padding: 0 10px; font-size: 13px; font-weight: 600; color: var(--text);
+  max-width: 160px;
+}
+@media (max-width: 640px) { .branch-switcher select { max-width: 110px; font-size: 12px; } }
+
 .user-chip { display: flex; align-items: center; gap: 8px; }
 .user-avatar {
   width: 34px; height: 34px; border-radius: 50%; background: var(--purple);

@@ -54,6 +54,9 @@
         <?php if (can('users', 'manage')): ?>
         <a href="<?= url('/users') ?>" class="<?= active_class($currentPath, '/users') ?>"><?= icon('users') ?> Users</a>
         <?php endif; ?>
+        <?php if (can('settings', 'manage')): ?>
+        <a href="<?= url('/branches') ?>" class="<?= active_class($currentPath, '/branches') ?>"><?= icon('suppliers') ?> Branches</a>
+        <?php endif; ?>
         <?php if (can('audit_log', 'view')): ?>
         <a href="<?= url('/audit-log') ?>" class="<?= active_class($currentPath, '/audit-log') ?>"><?= icon('audit') ?> Audit Log</a>
         <?php endif; ?>
