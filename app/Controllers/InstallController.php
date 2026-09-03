@@ -264,6 +264,7 @@ class InstallController extends Controller
         try {
             $this->runSqlFile($pdo, __DIR__ . '/../../database/schema.sql');
             $this->seedRolesAndPermissions($pdo);
+            $this->seedPlatformDefaults($pdo);
 
             $orgId = (int) ($pdo->query('SELECT id FROM organizations ORDER BY id LIMIT 1')->fetchColumn() ?: 0);
             if ($orgId === 0) {
@@ -274,9 +275,25 @@ class InstallController extends Controller
 
             $storeId = (int) ($pdo->query('SELECT id FROM stores ORDER BY id LIMIT 1')->fetchColumn() ?: 0);
             if ($storeId === 0) {
-                $stmt = $pdo->prepare('INSERT INTO stores (organization_id, name) VALUES (?, ?)');
+                $stmt = $pdo->prepare("INSERT INTO stores (organization_id, name, branch_code, is_main_branch, status) VALUES (?, ?, 'MAIN', 1, 'active')");
                 $stmt->execute([$orgId, $store['name'] ?: 'My Store']);
                 $storeId = (int) $pdo->lastInsertId();
+            }
+
+            // This installation's founding organization gets a real trial
+            // subscription, same as anyone registering through /register —
+            // it's a fresh signup, not a pre-existing customer being
+            // migrated (that's what database/migrate_saas.php is for).
+            $hasSubscription = $pdo->prepare('SELECT COUNT(*) FROM subscriptions WHERE organization_id = ?');
+            $hasSubscription->execute([$orgId]);
+            if ((int) $hasSubscription->fetchColumn() === 0) {
+                $trialPlanId = (int) $pdo->query("SELECT id FROM subscription_plans WHERE slug = 'trial'")->fetchColumn();
+                $trialDays = (int) ($pdo->query("SELECT setting_value FROM platform_settings WHERE setting_key = 'trial_days'")->fetchColumn() ?: 14);
+                $subStmt = $pdo->prepare(
+                    "INSERT INTO subscriptions (organization_id, subscription_plan_id, billing_period, status, trial_ends_at)
+                     VALUES (?, ?, 'trial', 'trial', DATE_ADD(NOW(), INTERVAL ? DAY))"
+                );
+                $subStmt->execute([$orgId, $trialPlanId, $trialDays]);
             }
 
             $featureStmt = $pdo->prepare(
@@ -389,14 +406,22 @@ class InstallController extends Controller
 
             $ownerRoleId = (int) $pdo->query("SELECT id FROM roles WHERE role_key = 'owner'")->fetchColumn();
 
+            // Whoever runs the installer is, by definition, the person
+            // deploying this copy of Sukli — they get Platform Super Admin
+            // access alongside their Organization Owner role, the same way
+            // WordPress's first account gets full site capabilities. On a
+            // pre-existing install upgraded via migrate_saas.php this same
+            // grant is explicit and opt-in instead (--platform-admin=...),
+            // since there it can't be inferred as safely.
             $stmt = $pdo->prepare(
-                "INSERT INTO users (organization_id, store_id, role_id, name, username, email, password_hash, status)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, 'active')"
+                "INSERT INTO users (organization_id, store_id, role_id, name, username, email, password_hash, status, is_platform_admin)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, 'active', 1)"
             );
             $stmt->execute([
                 $orgId, $storeId, $ownerRoleId, $admin['name'], $admin['username'],
                 $admin['email'] ?: null, password_hash($admin['password'], PASSWORD_DEFAULT),
             ]);
+
             $userId = (int) $pdo->lastInsertId();
 
             $pdo->prepare('INSERT INTO user_store_access (user_id, store_id) VALUES (?, ?) ON DUPLICATE KEY UPDATE store_id = VALUES(store_id)')
@@ -561,6 +586,24 @@ class InstallController extends Controller
         )";
         $pdo->exec("INSERT INTO role_permissions (role_id, permission_id, allowed) SELECT 3, id, 1 FROM permissions WHERE {$cashierAllowed} ON DUPLICATE KEY UPDATE allowed = VALUES(allowed)");
         $pdo->exec("INSERT INTO role_permissions (role_id, permission_id, allowed) SELECT 3, id, 0 FROM permissions WHERE NOT {$cashierAllowed} ON DUPLICATE KEY UPDATE allowed = VALUES(allowed)");
+    }
+
+    /** Plan catalog + platform-wide defaults — needed before the founding organization's trial subscription can be created below. Platform Admin can edit all of this later. */
+    private function seedPlatformDefaults(PDO $pdo): void
+    {
+        $pdo->exec("
+            INSERT INTO subscription_plans (id, slug, name, description, monthly_price, yearly_price, max_branches, max_users, max_products, max_transactions_per_month, is_active, sort_order) VALUES
+                (1, 'trial', 'Free Trial', 'Full access during your trial period.', 0.00, 0.00, 1, 3, 100, 500, 1, 0),
+                (2, 'basic', 'Basic', 'For small single-branch stores.', 499.00, 4990.00, 1, 3, NULL, NULL, 1, 1),
+                (3, 'business', 'Business', 'For growing multi-branch stores.', 1499.00, 14990.00, 5, 15, NULL, NULL, 1, 2),
+                (4, 'enterprise', 'Enterprise', 'For larger businesses at unlimited scale.', 4999.00, 49990.00, NULL, NULL, NULL, NULL, 1, 3)
+            ON DUPLICATE KEY UPDATE name = VALUES(name)
+        ");
+        $pdo->exec("
+            INSERT INTO platform_settings (setting_key, setting_value) VALUES
+                ('trial_days', '14'), ('platform_name', 'Sukli')
+            ON DUPLICATE KEY UPDATE setting_value = setting_value
+        ");
     }
 
     private function runSqlFile(PDO $pdo, string $path): void

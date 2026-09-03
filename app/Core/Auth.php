@@ -50,6 +50,20 @@ class Auth
 
         Database::execute("UPDATE users SET last_login_at = NOW() WHERE id = ?", [$user['id']]);
 
+        self::establishSession($user);
+
+        return ['ok' => true, 'user' => $user];
+    }
+
+    /**
+     * Populates the session for an already-verified user — the part of
+     * attempt() after password verification, factored out so registration
+     * (which just created the account, nothing to verify) can log someone
+     * in without faking a password check. $user must include role_key
+     * (join users to roles, as attempt()'s query does).
+     */
+    public static function establishSession(array $user): void
+    {
         Session::regenerate();
         Session::put('user_id', (int) $user['id']);
         Session::put('organization_id', (int) $user['organization_id']);
@@ -57,8 +71,6 @@ class Auth
         Session::put('role_key', $user['role_key']);
         Session::put('role_id', (int) $user['role_id']);
         Session::put('is_platform_admin', (bool) $user['is_platform_admin']);
-
-        return ['ok' => true, 'user' => $user];
     }
 
     public static function logout(): void

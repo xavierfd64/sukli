@@ -25,5 +25,9 @@
             </div>
             <button type="submit" class="btn btn-primary btn-block btn-lg">Sign In</button>
         </form>
+
+        <p class="text-muted" style="text-align:center;font-size:12.5px;margin-top:16px;">
+            New to Sukli? <a href="<?= url('/register') ?>">Start a free trial</a>
+        </p>
     </div>
 </div>

@@ -16,6 +16,7 @@ use Sukli\Controllers\IncomeController;
 use Sukli\Controllers\InstallController;
 use Sukli\Controllers\InventoryController;
 use Sukli\Controllers\PosController;
+use Sukli\Controllers\RegistrationController;
 use Sukli\Controllers\ReportController;
 use Sukli\Controllers\RoleController;
 use Sukli\Controllers\SettingsController;
@@ -62,6 +63,8 @@ $router->get('/', [DashboardController::class, 'index'], [$auth]);
 $router->get('/login', [AuthController::class, 'showLogin'], [$guest]);
 $router->post('/login', [AuthController::class, 'login'], [$guest, $csrf]);
 $router->post('/logout', [AuthController::class, 'logout'], [$authOnly, $csrf]);
+$router->get('/register', [RegistrationController::class, 'show'], [$guest]);
+$router->post('/register', [RegistrationController::class, 'store'], [$guest, $csrf]);
 
 // -- Subscription / Billing (always reachable once logged in, even expired) --
 $router->get('/subscription', [SubscriptionController::class, 'index'], [$authOnly]);
