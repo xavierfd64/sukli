@@ -10,6 +10,7 @@ use Sukli\Core\Database;
 use Sukli\Core\Request;
 use Sukli\Core\Session;
 use Sukli\Services\AuditService;
+use Sukli\Services\PlatformSettingsService;
 use Sukli\Services\SubscriptionService;
 use Sukli\Services\UploadService;
 
@@ -266,13 +267,13 @@ class PlatformAdminController extends Controller
 
     public function settings(Request $request): void
     {
-        $rows = Database::all("SELECT setting_key, setting_value FROM platform_settings");
-        $settings = array_column($rows, 'setting_value', 'setting_key');
-
         $this->view('platform-admin/settings', [
             'pageTitle' => 'Platform Settings',
-            'trialDays' => (int) ($settings['trial_days'] ?? 14),
-            'platformName' => $settings['platform_name'] ?? 'Sukli',
+            'trialDays' => (int) PlatformSettingsService::get('trial_days', '14'),
+            'platformName' => PlatformSettingsService::get('platform_name', 'Sukli'),
+            'themeColor' => PlatformSettingsService::get('theme_color', PlatformSettingsService::DEFAULT_ACCENT),
+            'themeFont' => PlatformSettingsService::get('theme_font', PlatformSettingsService::DEFAULT_FONT),
+            'fontChoices' => PlatformSettingsService::FONT_CHOICES,
         ], 'layouts/platform-admin');
     }
 
@@ -281,17 +282,43 @@ class PlatformAdminController extends Controller
         $trialDays = max(1, (int) $request->input('trial_days', 14));
         $platformName = $request->trimmed('platform_name') ?: 'Sukli';
 
-        Database::execute(
-            "INSERT INTO platform_settings (setting_key, setting_value) VALUES ('trial_days', ?) ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value)",
-            [(string) $trialDays]
-        );
-        Database::execute(
-            "INSERT INTO platform_settings (setting_key, setting_value) VALUES ('platform_name', ?) ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value)",
-            [$platformName]
-        );
+        PlatformSettingsService::set('trial_days', (string) $trialDays);
+        PlatformSettingsService::set('platform_name', $platformName);
 
         AuditService::log('update', 'platform_admin', 'platform_settings', 0);
         Session::flash('success', 'Settings saved.');
+        $this->redirect('/platform-admin/settings');
+    }
+
+    public function updateAppearance(Request $request): void
+    {
+        $color = strtolower(trim($request->trimmed('theme_color') ?? ''));
+        $font = $request->trimmed('theme_font') ?? '';
+
+        if (!preg_match('/^#[0-9a-f]{6}$/', $color)) {
+            Session::flash('error', 'Enter a valid color (e.g. #16a34a).');
+            $this->redirect('/platform-admin/settings');
+        }
+        if (!isset(PlatformSettingsService::FONT_CHOICES[$font])) {
+            Session::flash('error', 'Select a valid font.');
+            $this->redirect('/platform-admin/settings');
+        }
+
+        PlatformSettingsService::set('theme_color', $color);
+        PlatformSettingsService::set('theme_font', $font);
+
+        AuditService::log('update', 'platform_admin', 'platform_theme', 0, null, ['theme_color' => $color, 'theme_font' => $font]);
+        Session::flash('success', 'Appearance saved.');
+        $this->redirect('/platform-admin/settings');
+    }
+
+    public function resetAppearance(Request $request): void
+    {
+        PlatformSettingsService::set('theme_color', PlatformSettingsService::DEFAULT_ACCENT);
+        PlatformSettingsService::set('theme_font', PlatformSettingsService::DEFAULT_FONT);
+
+        AuditService::log('update', 'platform_admin', 'platform_theme', 0, null, ['reset' => true]);
+        Session::flash('success', 'Appearance reset to default.');
         $this->redirect('/platform-admin/settings');
     }
 

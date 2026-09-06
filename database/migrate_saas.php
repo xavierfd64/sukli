@@ -79,13 +79,13 @@ function addColumnIfMissing(PDO $pdo, string $table, string $column, string $def
     echo "  + added {$table}.{$column}\n";
 }
 
-echo "Step 1/4: adding new columns to existing tables...\n";
+echo "Step 1/5: adding new columns to existing tables...\n";
 addColumnIfMissing($pdo, 'organizations', 'slug', 'slug VARCHAR(80) NULL UNIQUE');
 addColumnIfMissing($pdo, 'stores', 'branch_code', 'branch_code VARCHAR(30) NULL');
 addColumnIfMissing($pdo, 'stores', 'is_main_branch', 'is_main_branch TINYINT(1) NOT NULL DEFAULT 0');
 addColumnIfMissing($pdo, 'users', 'is_platform_admin', 'is_platform_admin TINYINT(1) NOT NULL DEFAULT 0');
 
-echo "Step 2/4: creating new SaaS tables (no-op if they already exist)...\n";
+echo "Step 2/5: creating new SaaS tables (no-op if they already exist)...\n";
 $pdo->exec("CREATE TABLE IF NOT EXISTS subscription_plans (
     id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     slug VARCHAR(40) NOT NULL,
@@ -155,7 +155,7 @@ $pdo->exec("CREATE TABLE IF NOT EXISTS platform_settings (
     UNIQUE KEY uq_platform_settings_key (setting_key)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
 
-echo "Step 3/4: seeding plan catalog and platform defaults...\n";
+echo "Step 3/5: seeding plan catalog and platform defaults...\n";
 $pdo->exec("INSERT INTO subscription_plans (id, slug, name, description, monthly_price, yearly_price, max_branches, max_users, max_products, max_transactions_per_month, is_active, sort_order) VALUES
     (1, 'trial', 'Free Trial', 'Full access during your trial period.', 0.00, 0.00, 1, 3, 100, 500, 1, 0),
     (2, 'basic', 'Basic', 'For small single-branch stores.', 499.00, 4990.00, 1, 3, NULL, NULL, 1, 1),
@@ -163,10 +163,10 @@ $pdo->exec("INSERT INTO subscription_plans (id, slug, name, description, monthly
     (4, 'enterprise', 'Enterprise', 'For larger businesses at unlimited scale.', 4999.00, 49990.00, NULL, NULL, NULL, NULL, 1, 3)
     ON DUPLICATE KEY UPDATE name = VALUES(name)");
 $pdo->exec("INSERT INTO platform_settings (setting_key, setting_value) VALUES
-    ('trial_days', '14'), ('platform_name', 'Sukli')
+    ('trial_days', '14'), ('platform_name', 'Sukli'), ('theme_color', '#16a34a'), ('theme_font', 'system')
     ON DUPLICATE KEY UPDATE setting_value = setting_value");
 
-echo "Step 4/4: grandfathering existing organizations onto an active subscription...\n";
+echo "Step 4/5: grandfathering existing organizations onto an active subscription...\n";
 $businessPlanId = (int) $pdo->query("SELECT id FROM subscription_plans WHERE slug = 'business'")->fetchColumn();
 
 $orgs = $pdo->query("SELECT id, name FROM organizations")->fetchAll(PDO::FETCH_ASSOC);
@@ -200,6 +200,24 @@ foreach ($orgs as $org) {
     } else {
         echo "  - organization \"{$org['name']}\" (#{$orgId}) already has a subscription, skipping\n";
     }
+}
+
+echo "Step 5/5: repairing subscriptions.billing_period left stale by an earlier version of approvePaymentAndRenew()...\n";
+$stale = $pdo->query(
+    "SELECT id, organization_id FROM subscriptions WHERE billing_period = 'trial' AND status != 'trial'"
+)->fetchAll(PDO::FETCH_ASSOC);
+if ($stale) {
+    // Cosmetic-only backfill: billing_period is a display label, not used to
+    // compute any date or amount, so defaulting the unknown historical cases
+    // to 'monthly' is safe — Platform Admin can correct any that were
+    // actually yearly via a plan change, no data is at risk either way.
+    $fix = $pdo->prepare("UPDATE subscriptions SET billing_period = 'monthly' WHERE id = ?");
+    foreach ($stale as $row) {
+        $fix->execute([$row['id']]);
+        echo "  + subscription #{$row['id']} (organization #{$row['organization_id']}): billing_period 'trial' -> 'monthly'\n";
+    }
+} else {
+    echo "  - no stale rows found, skipping\n";
 }
 
 foreach ($argv as $arg) {

@@ -14,7 +14,7 @@ class AuthController extends Controller
 {
     public function showLogin(Request $request): void
     {
-        $this->view('auth/login', ['error' => Session::flash('error')], 'layouts/blank');
+        $this->view('auth/login', ['pageTitle' => 'Login', 'error' => Session::flash('error')], 'layouts/blank');
     }
 
     public function login(Request $request): void

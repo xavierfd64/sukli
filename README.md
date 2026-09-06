@@ -184,3 +184,59 @@ dashboard, the Android app, and BIR fiscal compliance. The database schema
 (`organizations` → `stores` → everything else, with `store_id` on every
 scoped table) is designed so those can be added later without a schema
 rewrite.
+
+## Platform Corrections (Branding, Subscription Status, Theme, System Update)
+
+A later, targeted correction pass fixed four things without touching any
+working feature:
+
+1. **Dynamic browser titles.** No layout hardcodes "Sukli" anymore.
+   `View::render()` (`app/Core/View.php`) injects `platformName` (from
+   `platform_settings.platform_name`, editable at Platform Admin → Settings)
+   and `tenantName` (the logged-in user's organization name) into every
+   page; each layout's `<title>` combines them with the page name — e.g.
+   "POS — Jilad Native Cakes" for a tenant page, "Login — Gatang" for a
+   public/auth page. Renaming the platform at Platform Admin → Settings
+   takes effect everywhere on the next request. `PlatformSettingsService`
+   (`app/Services/PlatformSettingsService.php`) is the single source of
+   truth this reads from, and it degrades to defaults (never a fatal error)
+   if the database isn't reachable yet — which matters because the
+   installer renders pages before any database is configured at all.
+2. **Subscription status/billing_period consistency.** Approving a
+   subscription payment (`SubscriptionService::approvePaymentAndRenew()`)
+   now also persists the approved `billing_period` (`monthly`/`yearly`) onto
+   the subscription row — an earlier version flipped `status` to `active`
+   correctly but left `billing_period` stuck at `'trial'` forever after a
+   trial org's first approval. `database/migrate_saas.php` includes a
+   one-time, idempotent backfill (Step 5/5) for any subscription an older
+   build already left in that stale state; it only touches the
+   `billing_period` label, never `status`, dates, or amounts.
+3. **Platform appearance (Platform Admin only).** Platform Admin → Settings
+   has a "System Appearance" card: a color picker (`--accent` CSS variable)
+   and a font choice from four fixed, network-free system font stacks (no
+   arbitrary CSS/URL entry). Both are stored in `platform_settings` and
+   applied via a small inline `<style>` override in each layout, defaulting
+   to the exact original hardcoded values so an unthemed install renders
+   identically to before this existed. Scoped deliberately to primary
+   buttons/active navigation/section tabs only — status badges and the POS
+   selected-product highlight keep their original semantic colors, since
+   recoloring "Active"/"Approved" to an admin's brand color would hurt
+   readability, not branding. Gated by the existing `PlatformAdminMiddleware`
+   — tenant users cannot reach these routes.
+4. **System Update (Platform Admin → System Update).** This didn't exist
+   before (`UpdateService` was a stub reserved for a future network-based
+   update check). It now accepts a ZIP upload, and
+   `UpdateService::validateAndProcessPackage()` runs it through: ZIP
+   validity, an `update.json` manifest (required fields: `package_name`,
+   `version`, `type`, `min_php_version`, `files`), PHP-version compatibility,
+   and a path-safety check on every declared file (rejects traversal,
+   absolute paths, and anything under a protected prefix — `.env`,
+   `config/`, `storage/`, `app/`, etc. — before a single byte is extracted).
+   Only a package explicitly typed `"test"` is then extracted — strictly the
+   files its manifest declares, nothing else — into a quarantine folder
+   under `storage/updates/` (never web-reachable; inherits the parent
+   `storage/.htaccess` deny-all) and verified there. **There is no code path
+   anywhere in this feature that copies a file into the live application** —
+   uploading any package, test or otherwise, can never do more than prove
+   the pipeline works. See `Sukli_Update_Test.zip` (delivered alongside this
+   codebase) for a ready-made package that exercises every step.

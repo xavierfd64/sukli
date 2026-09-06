@@ -16,7 +16,7 @@ class RegistrationController extends Controller
 {
     public function show(Request $request): void
     {
-        $this->view('auth/register', ['error' => Session::flash('error')], 'layouts/blank');
+        $this->view('auth/register', ['pageTitle' => 'Create Your Account', 'error' => Session::flash('error')], 'layouts/blank');
     }
 
     public function store(Request $request): void

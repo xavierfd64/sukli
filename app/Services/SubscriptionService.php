@@ -151,11 +151,24 @@ class SubscriptionService
         Database::execute("UPDATE subscriptions SET subscription_plan_id = ? WHERE id = ?", [$planId, $subscriptionId]);
     }
 
-    /** Approving a subscription_payments row moves the subscription to that payment's plan and extends it by one full billing period from it — the only path that turns a 'pending' payment into actual access. */
+    /**
+     * Approving a subscription_payments row moves the subscription to that
+     * payment's plan and extends it by one full billing period from it — the
+     * only path that turns a 'pending' payment into actual access. Also
+     * persists $billingPeriod onto the subscription row itself: extend()
+     * flips status to 'active' but never touched billing_period, so a trial
+     * org's first approval left status='active' sitting next to a
+     * billing_period column still reading 'trial' forever — a real
+     * underlying-state bug, not just a display issue (nothing currently
+     * renders billing_period as the status badge, but the two columns
+     * disagreeing is exactly the kind of stale state this method must not
+     * produce).
+     */
     public static function approvePaymentAndRenew(int $subscriptionId, int $planId, string $billingPeriod): void
     {
         self::changePlan($subscriptionId, $planId);
         self::extend($subscriptionId, $billingPeriod === 'yearly' ? 365 : 30);
+        Database::execute("UPDATE subscriptions SET billing_period = ? WHERE id = ?", [$billingPeriod, $subscriptionId]);
     }
 
     /** Platform Admin manually restoring access (e.g. after resolving a support issue) without waiting for a new payment. Does not touch current_period_end — if it's already in the past, the next reconcileStatus() call will flip this straight back to expired, which is the correct behavior for "give them a look, not a free period." */

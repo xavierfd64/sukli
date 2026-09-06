@@ -29,13 +29,23 @@
   --sidebar-w: 250px;
   --topbar-h: 64px;
   --bottomnav-h: 60px;
+
+  /* Platform Admin-configurable brand accent/font (Settings -> Appearance).
+     Defaults match the original hardcoded values below exactly, so an
+     un-themed install renders byte-for-byte the same as before this existed.
+     Deliberately scoped to primary buttons/active-nav/selected-states only —
+     never status badges (semantic: green=good/red=bad) or generic <a> color,
+     so an admin's color choice can't make "Active" render red or turn every
+     link in the app into a brand-colored hyperlink. */
+  --accent: #16a34a;
+  --font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
 }
 
 * { box-sizing: border-box; }
 html, body { height: 100%; }
 body {
   margin: 0;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  font-family: var(--font-family);
   background: var(--bg);
   color: var(--text);
   font-size: 14px;
@@ -102,7 +112,7 @@ button { font-family: inherit; cursor: pointer; }
 }
 .sidebar-nav a svg { flex-shrink: 0; opacity: 0.85; }
 .sidebar-nav a:hover { background: rgba(255,255,255,0.06); color: #fff; }
-.sidebar-nav a.is-active { background: var(--green); color: #fff; }
+.sidebar-nav a.is-active { background: var(--accent); color: #fff; }
 .sidebar-nav a.is-active svg { opacity: 1; }
 .sidebar-nav .nav-section-label {
   font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.06em;
@@ -180,7 +190,7 @@ button { font-family: inherit; cursor: pointer; }
   flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
   gap: 2px; font-size: 10.5px; color: var(--text-muted); background: none; border: none;
 }
-.bottom-nav a.is-active, .bottom-nav button.more-btn.is-active { color: var(--green); }
+.bottom-nav a.is-active, .bottom-nav button.more-btn.is-active { color: var(--accent); }
 .bottom-nav svg { flex-shrink: 0; }
 
 /* ---------------------------------------------------------------------- */
@@ -235,8 +245,8 @@ button { font-family: inherit; cursor: pointer; }
 .btn-block { width: 100%; }
 .btn-sm { padding: 6px 10px; font-size: 12px; }
 .btn-lg { padding: 13px 18px; font-size: 14.5px; }
-.btn-primary { background: var(--green); border-color: var(--green); color: #fff; }
-.btn-primary:hover { background: var(--green-dark); }
+.btn-primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+.btn-primary:hover { filter: brightness(0.9); }
 .btn-purple { background: var(--purple); border-color: var(--purple); color: #fff; }
 .btn-purple:hover { background: var(--purple-dark); }
 .btn-outline { background: #fff; border-color: var(--border); color: var(--text); }
@@ -340,7 +350,7 @@ label { display: block; font-size: 12.5px; font-weight: 600; margin-bottom: 6px;
 .text-right { text-align: right; }
 .section-tabs { display: flex; gap: 6px; margin-bottom: 16px; border-bottom: 1px solid var(--border); }
 .section-tabs a { padding: 9px 4px; margin-right: 18px; font-size: 13px; font-weight: 600; color: var(--text-muted); border-bottom: 2px solid transparent; }
-.section-tabs a.is-active { color: var(--text); border-color: var(--green); }
+.section-tabs a.is-active { color: var(--text); border-color: var(--accent); }
 
 .modal-backdrop { position: fixed; inset: 0; background: rgba(10,14,26,0.5); display: none; align-items: center; justify-content: center; z-index: 60; padding: 16px; }
 .modal-backdrop.is-open { display: flex; }

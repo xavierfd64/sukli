@@ -197,5 +197,7 @@ ON DUPLICATE KEY UPDATE name = VALUES(name), description = VALUES(description);
 -- Platform-wide defaults (Platform Admin can change these).
 INSERT INTO platform_settings (setting_key, setting_value) VALUES
     ('trial_days', '14'),
-    ('platform_name', 'Sukli')
+    ('platform_name', 'Sukli'),
+    ('theme_color', '#16a34a'),
+    ('theme_font', 'system')
 ON DUPLICATE KEY UPDATE setting_value = setting_value;

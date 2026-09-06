@@ -3,8 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title><?= e($pageTitle ?? 'Platform Admin') ?> — Sukli</title>
+<title><?= e(($pageTitle ?? 'Platform Admin') . ' — ' . ($platformName ?? 'Sukli')) ?></title>
 <link rel="stylesheet" href="<?= asset('css/app.css') ?>">
+<style>:root{--accent:<?= e($themeColor ?? '#16a34a') ?>;--font-family:<?= e(\Sukli\Services\PlatformSettingsService::FONT_CHOICES[$themeFont ?? 'system']['stack'] ?? \Sukli\Services\PlatformSettingsService::FONT_CHOICES['system']['stack']) ?>;}</style>
 </head>
 <body>
 <div class="app-shell">
@@ -22,6 +23,7 @@
             <a href="<?= url('/platform-admin/plans') ?>" class="<?= active_class($currentPath, '/platform-admin/plans') ?>"><?= icon('wallet') ?> Plans</a>
             <a href="<?= url('/platform-admin/payments') ?>" class="<?= active_class($currentPath, '/platform-admin/payments') ?>"><?= icon('cash') ?> Payments</a>
             <a href="<?= url('/platform-admin/settings') ?>" class="<?= active_class($currentPath, '/platform-admin/settings') ?>"><?= icon('settings') ?> Settings</a>
+            <a href="<?= url('/platform-admin/system-update') ?>" class="<?= active_class($currentPath, '/platform-admin/system-update') ?>"><?= icon('archive') ?> System Update</a>
 
             <div class="nav-section-label">&nbsp;</div>
             <a href="<?= url('/dashboard') ?>"><?= icon('chevron-right') ?> Back to My Store</a>

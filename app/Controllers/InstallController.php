@@ -601,7 +601,7 @@ class InstallController extends Controller
         ");
         $pdo->exec("
             INSERT INTO platform_settings (setting_key, setting_value) VALUES
-                ('trial_days', '14'), ('platform_name', 'Sukli')
+                ('trial_days', '14'), ('platform_name', 'Sukli'), ('theme_color', '#16a34a'), ('theme_font', 'system')
             ON DUPLICATE KEY UPDATE setting_value = setting_value
         ");
     }

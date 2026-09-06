@@ -23,6 +23,7 @@ use Sukli\Controllers\RoleController;
 use Sukli\Controllers\SettingsController;
 use Sukli\Controllers\SubscriptionController;
 use Sukli\Controllers\SupplierController;
+use Sukli\Controllers\UpdateController;
 use Sukli\Controllers\UserController;
 use Sukli\Controllers\UtangController;
 use Sukli\Middleware\AuthMiddleware;
@@ -193,6 +194,10 @@ $router->post('/platform-admin/payments/{id}/approve', [PlatformAdminController:
 $router->post('/platform-admin/payments/{id}/reject', [PlatformAdminController::class, 'rejectPayment'], [$platformAdmin, $csrf]);
 $router->get('/platform-admin/settings', [PlatformAdminController::class, 'settings'], [$platformAdmin]);
 $router->post('/platform-admin/settings', [PlatformAdminController::class, 'updateSettings'], [$platformAdmin, $csrf]);
+$router->post('/platform-admin/settings/appearance', [PlatformAdminController::class, 'updateAppearance'], [$platformAdmin, $csrf]);
+$router->post('/platform-admin/settings/appearance/reset', [PlatformAdminController::class, 'resetAppearance'], [$platformAdmin, $csrf]);
 $router->post('/platform-admin/organizations/{id}/suspend', [PlatformAdminController::class, 'suspendOrganization'], [$platformAdmin, $csrf]);
 $router->post('/platform-admin/organizations/{id}/reactivate', [PlatformAdminController::class, 'reactivateOrganization'], [$platformAdmin, $csrf]);
 $router->get('/platform-admin/organizations/{id}', [PlatformAdminController::class, 'organizationDetail'], [$platformAdmin]);
+$router->get('/platform-admin/system-update', [UpdateController::class, 'index'], [$platformAdmin]);
+$router->post('/platform-admin/system-update', [UpdateController::class, 'upload'], [$platformAdmin, $csrf]);
